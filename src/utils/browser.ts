@@ -29,6 +29,7 @@ export function buildResultShareUrl(options: {
   score: number;
   playerName?: string;
   resultId?: string;
+  backend?: 'express' | 'php';
 }): string {
   if (typeof window === 'undefined') return '';
   const base = window.location.origin + window.location.pathname;
@@ -40,6 +41,9 @@ export function buildResultShareUrl(options: {
   }
   if (options.resultId) {
     params.set('id', options.resultId);
+    if (options.backend === 'php') {
+      params.set('mode', 'php');
+    }
   }
   params.set('auto_popup', '1');
   return `${base}?${params.toString()}`;

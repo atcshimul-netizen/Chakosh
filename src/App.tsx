@@ -20,6 +20,7 @@ export default function App() {
   const initialScore = !isNaN(paramScore) && searchParams.has('score') ? paramScore : null;
   const initialName = searchParams.get('name') || '';
   const initialResultId = searchParams.get('id') || null;
+  const initialResultBackend = searchParams.get('mode') === 'php' ? 'php' : undefined;
   const autoOpenPopup = searchParams.get('auto_popup') === '1' || hasResultParam;
 
   const [stage, setStage] = useState<QuizStage>(() => (hasResultParam ? 'result' : 'welcome'));
@@ -143,6 +144,7 @@ export default function App() {
             onRestart={handleRestart}
             initialPlayerName={initialName}
             initialResultId={initialResultId}
+            initialResultBackend={initialResultBackend}
             autoOpenPopup={autoOpenPopup}
           />
         )}

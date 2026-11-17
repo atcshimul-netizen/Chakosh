@@ -43,6 +43,7 @@ interface ResultScreenProps {
   onRestart: () => void;
   initialPlayerName?: string;
   initialResultId?: string | null;
+  initialResultBackend?: 'express' | 'php';
   autoOpenPopup?: boolean;
 }
 
@@ -52,6 +53,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   onRestart,
   initialPlayerName = '',
   initialResultId = null,
+  initialResultBackend,
   autoOpenPopup = false,
 }) => {
   // Optional personalisation state (client-side only)
@@ -103,20 +105,52 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   useEffect(() => {
     if (initialResultId && !generatedAssets) {
       const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-      const downloadUrl = `${window.location.origin}${base}/api/download/${initialResultId}`;
-      const imageUrl = `${window.location.origin}${base}/api/image/${initialResultId}`;
+      const usePhpEndpoint = initialResultBackend === 'php';
+      const downloadUrl = usePhpEndpoint
+        ? `${window.location.origin}${base}/api/result-image.php?action=download&id=${initialResultId}`
+        : `${window.location.origin}${base}/api/download/${initialResultId}`;
+      const imageUrl = usePhpEndpoint
+        ? `${window.location.origin}${base}/api/result-image.php?action=image&id=${initialResultId}`
+        : `${window.location.origin}${base}/api/image/${initialResultId}`;
+
       setGeneratedAssets({
         blob: null as any,
         blobUrl: imageUrl,
         dataUrl: imageUrl,
         filename: 'chakosh-result.png',
         downloadUrl,
+        imageUrl,
         id: initialResultId,
+        backend: initialResultBackend,
       });
+
       if (autoOpenPopup) {
         setShowPopup(true);
       }
-      return;
+
+      // Background prefetch so native share button works seamlessly in Chrome too
+      let cancelled = false;
+      fetch(imageUrl)
+        .then((res) => {
+          const contentType = res.headers.get('content-type') || '';
+          if (!res.ok || !contentType.includes('image/png')) return null;
+          return res.blob();
+        })
+        .then((blob) => {
+          if (cancelled || !blob || blob.size === 0) return;
+          setGeneratedAssets((prev) => {
+            if (!prev || prev.id !== initialResultId) return prev;
+            return {
+              ...prev,
+              blob,
+            };
+          });
+        })
+        .catch(() => {});
+
+      return () => {
+        cancelled = true;
+      };
     }
 
     if (autoOpenPopup && !initialResultId && !generatedAssets && !isGenerating) {
@@ -136,7 +170,9 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
               setGeneratedAssets({
                 ...assets,
                 downloadUrl: serverRes.downloadUrl,
+                imageUrl: serverRes.imageUrl,
                 id: serverRes.id,
+                backend: serverRes.backend,
               });
             }
           } catch {
@@ -161,7 +197,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         cancelled = true;
       };
     }
-  }, [initialResultId, autoOpenPopup]);
+  }, [initialResultId, initialResultBackend, autoOpenPopup]);
 
   // Invalidate cached photocard if player changes name or photo
   useEffect(() => {
@@ -228,10 +264,24 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
   const handleGenerateAndOpenPopup = async () => {
     soundEffects.playTap();
-    setIsGenerating(true);
     setGenerationError(null);
     setPopupNotice(null);
     setRedirectCountdown(null);
+
+    // If opened from an external browser handoff and user hasn't edited name/photo,
+    // reopen the preserved photocard directly instead of overwriting it without the photo.
+    if (
+      generatedAssets &&
+      initialResultId &&
+      generatedAssets.id === initialResultId &&
+      playerName === initialPlayerName &&
+      !profileImageUrl
+    ) {
+      setShowPopup(true);
+      return;
+    }
+
+    setIsGenerating(true);
 
     try {
       const assets = await generateResultAssets({
@@ -247,11 +297,12 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         finalAssets = {
           ...assets,
           downloadUrl: serverRes.downloadUrl,
+          imageUrl: serverRes.imageUrl,
           id: serverRes.id,
+          backend: serverRes.backend,
         };
       } catch (uploadErr) {
-        // Static hosting deployments (e.g., /koto-boro-chakhor/) have no /api/* backend;
-        // continue seamlessly using the client-side generated Blob & Data URL.
+        // Static hosting deployments without PHP/Node support fall back to in-session Blob & Data URL
         console.warn('Server upload unavailable, using client-side photocard download:', uploadErr);
       }
 
@@ -263,6 +314,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
           score,
           playerName,
           resultId: finalAssets.id,
+          backend: finalAssets.backend,
         });
         window.history.replaceState(null, '', shareUrl);
       } catch {}
@@ -284,6 +336,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       score,
       playerName,
       resultId: generatedAssets?.id || undefined,
+      backend: generatedAssets?.backend || initialResultBackend,
     });
 
     try {
@@ -291,6 +344,38 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     } catch {}
 
     openExternalBrowserWithUrl(resultUrl);
+  };
+
+  const handlePreviewImageError = () => {
+    if (!generatedAssets?.id || !generatedAssets.dataUrl.startsWith('http')) return;
+
+    if (!generatedAssets.dataUrl.includes('result-image.php')) {
+      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+      const phpImageUrl = `${window.location.origin}${base}/api/result-image.php?action=image&id=${generatedAssets.id}`;
+      const phpDownloadUrl = `${window.location.origin}${base}/api/result-image.php?action=download&id=${generatedAssets.id}`;
+      setGeneratedAssets((prev) =>
+        prev
+          ? {
+              ...prev,
+              blobUrl: phpImageUrl,
+              dataUrl: phpImageUrl,
+              imageUrl: phpImageUrl,
+              downloadUrl: phpDownloadUrl,
+              backend: 'php',
+            }
+          : prev
+      );
+      return;
+    }
+
+    generateResultAssets({
+      score,
+      personality,
+      playerName,
+      profileImageUrl,
+    })
+      .then((fresh) => setGeneratedAssets(fresh))
+      .catch(() => {});
   };
 
   const handlePopupDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -608,18 +693,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                         src={generatedAssets.dataUrl}
                         alt="চা-খোর রেজাল্ট কার্ড"
                         className="w-full h-full object-contain"
-                        onError={() => {
-                          if (generatedAssets.id && generatedAssets.dataUrl.startsWith('http')) {
-                            generateResultAssets({
-                              score,
-                              personality,
-                              playerName,
-                              profileImageUrl,
-                            })
-                              .then((fresh) => setGeneratedAssets(fresh))
-                              .catch(() => {});
-                          }
-                        }}
+                        onError={handlePreviewImageError}
                       />
                     </div>
 
@@ -659,18 +733,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                       src={generatedAssets.dataUrl}
                       alt="চা-খোর রেজাল্ট কার্ড"
                       className="w-full h-full object-contain"
-                      onError={() => {
-                        if (generatedAssets.id && generatedAssets.dataUrl.startsWith('http')) {
-                          generateResultAssets({
-                            score,
-                            personality,
-                            playerName,
-                            profileImageUrl,
-                          })
-                            .then((fresh) => setGeneratedAssets(fresh))
-                            .catch(() => {});
-                        }
-                      }}
+                      onError={handlePreviewImageError}
                     />
                   </div>
 

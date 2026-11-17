@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Route extensionless temporary result-image API endpoints to PHP handler
+  RewriteRule ^api/result-image/?$ api/result-image.php [L,QSA]
+  RewriteRule ^api/download/([a-fA-F0-9]{48})/?$ api/result-image.php?action=download&id=$1 [L,QSA]
+  RewriteRule ^api/image/([a-fA-F0-9]{48})/?$ api/result-image.php?action=image&id=$1 [L,QSA]
+
+  # Block direct access to internal temporary image folder
+  RewriteRule ^api/\.temp-downloads - [F,L]
+
+  # Serve existing files/directories directly so parent WordPress rules do not hijack them
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # SPA fallback inside deployment directory
+  RewriteRule ^ index.html [L]
+</IfModule>

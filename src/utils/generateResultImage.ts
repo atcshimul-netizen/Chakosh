@@ -15,7 +15,9 @@ export interface GeneratedResultAssets {
   dataUrl: string;
   filename: string;
   downloadUrl?: string;
+  imageUrl?: string;
   id?: string;
+  backend?: 'express' | 'php';
 }
 
 // Background template image (Image 2: Clean background template)
