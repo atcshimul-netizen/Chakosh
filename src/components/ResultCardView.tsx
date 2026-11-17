@@ -135,37 +135,31 @@ export const ResultCardView: React.FC<ResultCardViewProps> = ({
     );
   }
 
-  // On-screen responsive display card
+  // On-screen responsive display card (compact, fits mobile screens without duplicate header logo)
   return (
     <div className="w-full flex flex-col items-center">
-      {/* Uploaded Logo & Association Header */}
-      <div className="flex flex-col items-center mb-4 text-center">
-        <img
-          src={logoSrc}
-          alt="চাকস - চা-খোর কল্যাণ সমিতি"
-          className="h-14 sm:h-16 w-auto max-w-[260px] object-contain mb-2 drop-shadow-xs"
-          referrerPolicy="no-referrer"
-        />
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B4513] tracking-wide uppercase">
-          <Trophy className="w-4 h-4 text-[#D97706]" />
+      {/* Association Header (Logo is displayed in Header component above; omitted here to prevent duplicates) */}
+      <div className="flex flex-col items-center mb-2 text-center">
+        <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-[#8B4513] tracking-wide uppercase">
+          <Trophy className="w-3.5 h-3.5 text-[#D97706]" />
           কুইজের চূড়ান্ত ফলাফল
         </span>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#381B0E] mt-0.5">
+        <h1 className="text-lg sm:text-2xl font-extrabold text-[#381B0E] mt-0.5 tracking-tight">
           আপনি কত বড় চা-খোর?
         </h1>
       </div>
 
       {/* Main Result Card */}
-      <div className="w-full bg-[#FAF3EA] border border-[#E7D6C3] rounded-3xl p-6 sm:p-8 shadow-md text-center relative overflow-hidden mb-6">
+      <div className="w-full bg-[#FAF3EA] border border-[#E7D6C3] rounded-2xl p-3.5 sm:p-5 shadow-sm text-center relative overflow-hidden mb-3 sm:mb-4">
         {/* Subtle Decorative Background Glow */}
-        <div className="absolute -top-12 -right-12 w-36 h-36 bg-[#F59E0B]/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-[#8B4513]/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-28 h-28 bg-[#F59E0B]/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-28 h-28 bg-[#8B4513]/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Large Personality Emoji / Profile Photo & Badge */}
-        <div className="relative inline-block mb-3">
+        {/* Personality Emoji / Profile Photo & Badge */}
+        <div className="relative inline-block mb-1.5">
           <div
-            className={`w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-3xl bg-white border-2 border-[#E2CEBC] shadow-inner flex items-center justify-center text-5xl sm:text-6xl overflow-hidden select-none ${
-              profileImageUrl ? 'p-0' : 'p-2'
+            className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-2xl bg-white border-2 border-[#E2CEBC] shadow-inner flex items-center justify-center text-3xl sm:text-5xl overflow-hidden select-none ${
+              profileImageUrl ? 'p-0' : 'p-1.5'
             }`}
           >
             {profileImageUrl ? (
@@ -178,30 +172,30 @@ export const ResultCardView: React.FC<ResultCardViewProps> = ({
               personality.emoji
             )}
           </div>
-          <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-[#5C2C16] text-[#FDE68A] text-xs font-bold px-3.5 py-0.5 rounded-full whitespace-nowrap shadow-xs max-w-[230px] sm:max-w-[280px] truncate">
+          <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#5C2C16] text-[#FDE68A] text-[10px] sm:text-xs font-bold px-3 py-0.5 rounded-full whitespace-nowrap shadow-xs max-w-[200px] sm:max-w-[260px] truncate">
             {cleanName || `লেভেল ${toBengaliDigits(personality.level)}`}
           </span>
         </div>
 
         {/* Personality Title */}
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-[#381B0E] mt-3 mb-2 tracking-tight">
+        <h2 className="text-lg sm:text-2xl font-extrabold text-[#381B0E] mt-1.5 mb-1 tracking-tight">
           {personality.title}
         </h2>
 
         {/* Score Meter */}
-        <div className="my-5 inline-flex flex-col items-center">
+        <div className="my-1.5 inline-flex flex-col items-center">
           <div className="flex items-baseline gap-1 text-[#5C2C16]">
-            <span className="text-xs text-[#8C6D58] font-medium mr-1">মোট স্কোর:</span>
-            <span className="text-4xl sm:text-5xl font-black text-[#8B4513] font-mono tabular-nums">
+            <span className="text-[11px] sm:text-xs text-[#8C6D58] font-medium mr-1">মোট স্কোর:</span>
+            <span className="text-3xl sm:text-4xl font-black text-[#8B4513] font-mono tabular-nums leading-none">
               {bengaliScore}
             </span>
-            <span className="text-lg sm:text-xl font-bold text-[#A88C78] font-mono">
+            <span className="text-sm sm:text-base font-bold text-[#A88C78] font-mono">
               / ১০০
             </span>
           </div>
 
           {/* Visual Score Level Bar */}
-          <div className="w-48 sm:w-64 h-3 bg-[#E8DAC9] rounded-full overflow-hidden mt-2 p-0.5">
+          <div className="w-36 sm:w-52 h-2 bg-[#E8DAC9] rounded-full overflow-hidden mt-1 p-0.5">
             <div
               className="h-full bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#5C2C16] rounded-full transition-all duration-1000 ease-out"
               style={{ width: `${scorePercent}%` }}
@@ -210,18 +204,18 @@ export const ResultCardView: React.FC<ResultCardViewProps> = ({
         </div>
 
         {/* Personality Description Box */}
-        <div className="bg-white/90 border border-[#EADBCC] rounded-2xl p-4 sm:p-5 text-center mt-3 shadow-2xs">
-          <p className="text-base sm:text-lg text-[#3E2313] leading-relaxed font-medium">
+        <div className="bg-white/95 border border-[#EADBCC] rounded-xl p-2.5 sm:p-3 text-center mt-1.5 shadow-2xs">
+          <p className="text-xs sm:text-sm text-[#3E2313] leading-relaxed font-medium">
             "{personality.description}"
           </p>
         </div>
 
         {/* Mini Tea Aesthetic Lockup */}
-        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-[#8C6D58]">
+        <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-[#8C6D58]">
           <img
             src={teaCupImg}
             alt="মাটির কাপ"
-            className="w-5 h-5 rounded-full object-cover inline-block"
+            className="w-3.5 h-3.5 rounded-full object-cover inline-block"
             referrerPolicy="no-referrer"
           />
           <span>স্কোর সীমা: {toBengaliDigits(personality.minScore)}–{toBengaliDigits(personality.maxScore)} পয়েন্ট</span>

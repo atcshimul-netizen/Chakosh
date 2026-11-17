@@ -281,7 +281,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     : false;
 
   return (
-    <div className="w-full max-w-xl mx-auto px-4 py-6 sm:py-8 flex flex-col items-center">
+    <div className="w-full max-w-lg mx-auto px-3.5 sm:px-4 pt-1.5 pb-6 sm:py-6 flex flex-col items-center">
       {/* 1. Reusable On-Screen Result Card */}
       <ResultCardView
         score={score}
@@ -292,25 +292,25 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       />
 
       {/* 2. Optional Photocard Personalisation Card */}
-      <div className="w-full bg-white border border-[#E7D6C3] rounded-2xl p-4 sm:p-5 mb-5 shadow-xs">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm sm:text-base font-bold text-[#381B0E]">
+      <div className="w-full bg-white border border-[#E7D6C3] rounded-2xl p-3 sm:p-4 mb-3 sm:mb-4 shadow-2xs">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h3 className="text-xs sm:text-sm font-bold text-[#381B0E]">
             ফটোকার্ড পার্সোনালাইজ করুন{' '}
-            <span className="text-xs font-medium text-[#8C6D58]">(ঐচ্ছিক)</span>
+            <span className="text-[11px] font-medium text-[#8C6D58]">(ঐচ্ছিক)</span>
           </h3>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {/* Optional Name Input */}
           <div>
             <label
               htmlFor="player-name-input"
-              className="block text-xs font-semibold text-[#5C2C16] mb-1.5"
+              className="block text-[11px] sm:text-xs font-semibold text-[#5C2C16] mb-1"
             >
               আপনার নাম (ঐচ্ছিক)
             </label>
             <div className="relative flex items-center">
-              <User className="w-4 h-4 text-[#8C6D58] absolute left-3 pointer-events-none" />
+              <User className="w-3.5 h-3.5 text-[#8C6D58] absolute left-2.5 pointer-events-none" />
               <input
                 id="player-name-input"
                 type="text"
@@ -318,16 +318,16 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                 onChange={(e) => setPlayerName(e.target.value)}
                 maxLength={40}
                 placeholder="যেমন: তানভীর আহমেদ"
-                className="w-full h-11 pl-9 pr-9 rounded-xl border border-[#DFCBB5] bg-[#FAF7F2] text-base sm:text-sm text-[#2C1810] placeholder:text-[#A88C78] focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:bg-white transition-colors"
+                className="w-full h-9 sm:h-10 pl-8 pr-8 rounded-lg border border-[#DFCBB5] bg-[#FAF7F2] text-xs sm:text-sm text-[#2C1810] placeholder:text-[#A88C78] focus:outline-none focus:ring-1.5 focus:ring-[#8B4513] focus:bg-white transition-colors"
               />
               {playerName && (
                 <button
                   type="button"
                   onClick={() => setPlayerName('')}
-                  className="absolute right-2.5 p-1 rounded-full text-[#8C6D58] hover:text-[#5C2C16] hover:bg-[#EFE5D7]"
+                  className="absolute right-2 p-1 rounded-full text-[#8C6D58] hover:text-[#5C2C16]"
                   aria-label="নাম মুছে ফেলুন"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -335,7 +335,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
           {/* Optional Profile Picture Upload */}
           <div>
-            <span className="block text-xs font-semibold text-[#5C2C16] mb-1.5">
+            <span className="block text-[11px] sm:text-xs font-semibold text-[#5C2C16] mb-1">
               প্রোফাইল ছবি (ঐচ্ছিক)
             </span>
             <input
@@ -347,34 +347,34 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
             />
 
             {profileImageUrl ? (
-              <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-[#DFCBB5] bg-[#FAF7F2]">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-2.5 p-2 rounded-lg border border-[#DFCBB5] bg-[#FAF7F2]">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <img
                     src={profileImageUrl}
                     alt="প্রোফাইল প্রিভিউ"
-                    className="w-11 h-11 rounded-full object-cover border-2 border-[#8B4513] shrink-0"
+                    className="w-8 h-8 rounded-full object-cover border-2 border-[#8B4513] shrink-0"
                   />
-                  <span className="text-xs sm:text-sm font-semibold text-[#381B0E]">
+                  <span className="text-xs font-semibold text-[#381B0E] truncate">
                     ছবি যুক্ত হয়েছে
                   </span>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isProcessingPhoto}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#5C2C16] bg-[#EFE5D7] hover:bg-[#E4D5C1] cursor-pointer"
+                    className="px-2 py-1 rounded-md text-[11px] font-semibold text-[#5C2C16] bg-[#EFE5D7] hover:bg-[#E4D5C1] cursor-pointer"
                   >
                     পরিবর্তন
                   </button>
                   <button
                     type="button"
                     onClick={handleRemovePhoto}
-                    className="p-1.5 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 cursor-pointer"
+                    className="p-1 rounded-md text-rose-700 bg-rose-50 hover:bg-rose-100 cursor-pointer"
                     aria-label="ছবি মুছে ফেলুন"
                     title="ছবি মুছে ফেলুন"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -383,16 +383,16 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessingPhoto}
-                className="w-full h-11 px-4 rounded-xl border border-dashed border-[#C7AE94] bg-[#FAF7F2] hover:bg-[#F4EDE2] text-[#5C2C16] text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className="w-full h-9 sm:h-10 px-3 rounded-lg border border-dashed border-[#C7AE94] bg-[#FAF7F2] hover:bg-[#F4EDE2] text-[#5C2C16] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 {isProcessingPhoto ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     <span>ছবি প্রস্তুত হচ্ছে...</span>
                   </>
                 ) : (
                   <>
-                    <Upload className="w-4 h-4 text-[#8B4513]" />
+                    <Upload className="w-3.5 h-3.5 text-[#8B4513]" />
                     <span>ডিভাইস থেকে ছবি নির্বাচন করুন</span>
                   </>
                 )}
@@ -400,27 +400,27 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
             )}
 
             {uploadError && (
-              <p className="mt-1.5 text-xs text-rose-700 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <p className="mt-1 text-[11px] text-rose-700 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 shrink-0" />
                 <span>{uploadError}</span>
               </p>
             )}
           </div>
 
-          <p className="text-[11px] text-[#8C6D58] flex items-center gap-1.5 pt-0.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#2D6A4F] shrink-0" />
-            <span>ফটোকার্ড ডাউনলোডের জন্য কার্ডের ছবিটি সার্ভারে সাময়িকভাবে সংরক্ষিত হয় এবং ১০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যায়।</span>
+          <p className="text-[10px] text-[#8C6D58] flex items-center gap-1 pt-0.5 leading-tight">
+            <ShieldCheck className="w-3 h-3 text-[#2D6A4F] shrink-0" />
+            <span>ফটোকার্ডের ছবিটি সাময়িকভাবে সংরক্ষিত হয়ে ১০ মিনিট পর মুছে যায়।</span>
           </p>
         </div>
       </div>
 
       {/* 3. Main Action Buttons */}
-      <div className="w-full space-y-3 max-w-sm">
+      <div className="w-full space-y-2 max-w-sm">
         {/* Download Result as Image Button */}
         <button
           onClick={handleGenerateAndOpenPopup}
           disabled={isGenerating || isProcessingPhoto}
-          className={`w-full h-14 px-6 rounded-xl font-bold text-base sm:text-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B4513] ${
+          className={`w-full h-12 sm:h-13 px-5 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B4513] ${
             isGenerating || isProcessingPhoto
               ? 'bg-[#E5DACB] text-[#8C6D58] cursor-wait'
               : 'bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2]'
@@ -428,12 +428,12 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         >
           {isGenerating ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
               <span>ফটোকার্ড তৈরি হচ্ছে...</span>
             </>
           ) : (
             <>
-              <Download className="w-5 h-5 stroke-[2.5]" />
+              <Download className="w-4 h-4 stroke-[2.5]" />
               <span>ফলাফল ডাউনলোড করুন</span>
             </>
           )}
@@ -444,7 +444,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
           <button
             type="button"
             onClick={() => setShowPopup(true)}
-            className="w-full text-xs text-[#8B4513] hover:text-[#5C2C16] underline flex items-center justify-center gap-1 py-1 cursor-pointer"
+            className="w-full text-xs text-[#8B4513] hover:text-[#5C2C16] underline flex items-center justify-center gap-1 py-0.5 cursor-pointer"
           >
             <Eye className="w-3.5 h-3.5" />
             <span>ডাউনলোডকৃত কার্ডের প্রিভিউ দেখুন</span>
@@ -457,9 +457,9 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
             soundEffects.playTap();
             onRestart();
           }}
-          className="w-full h-13 px-6 rounded-xl bg-white hover:bg-[#FDFBF7] border border-[#D5C2AF] active:scale-[0.98] text-[#5C2C16] font-bold text-base flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B4513]"
+          className="w-full h-10 px-5 rounded-xl bg-white hover:bg-[#FDFBF7] border border-[#D5C2AF] active:scale-[0.98] text-[#5C2C16] font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B4513]"
         >
-          <RotateCcw className="w-5 h-5" />
+          <RotateCcw className="w-4 h-4" />
           <span>আবার খেলুন</span>
         </button>
       </div>
