@@ -51,7 +51,7 @@ export const QuestionScreen: React.FC<QuestionScreenProps> = ({
   };
 
   return (
-    <div className="w-full max-w-xl mx-auto px-4 py-5 flex flex-col justify-between min-h-[calc(100vh-4rem)]">
+    <div className="w-full max-w-xl mx-auto px-4 py-4 sm:py-6 flex flex-col">
       {/* Top Header & Progress */}
       <div className="space-y-4">
         {/* Step Indicator Row */}
@@ -142,11 +142,11 @@ export const QuestionScreen: React.FC<QuestionScreenProps> = ({
         </div>
       </div>
 
-      {/* Navigation Buttons Row */}
-      <div className="pt-6 pb-2">
+      {/* Navigation Buttons Row directly below options */}
+      <div className="pt-4 pb-2">
         <div className="flex items-center gap-3">
           {/* Previous Button */}
-          {!isFirst ? (
+          {!isFirst && (
             <button
               type="button"
               onClick={handlePrevClick}
@@ -155,8 +155,6 @@ export const QuestionScreen: React.FC<QuestionScreenProps> = ({
               <ChevronLeft className="w-5 h-5" />
               <span>আগের প্রশ্ন</span>
             </button>
-          ) : (
-            <div className="shrink-0" />
           )}
 
           {/* Next or View Results Button */}
