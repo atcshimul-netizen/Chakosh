@@ -83,49 +83,46 @@ export function openExternalBrowserWithUrl(url: string): void {
 }
 
 /**
- * Directly opens the Facebook group inside the official Facebook mobile app whenever possible.
- * On Android, uses an Android Intent targeting com.facebook.katana with a web fallback.
- * On iOS, tries the native fb:// scheme before falling back to web.
- * In the Facebook in-app browser, uses fb://facewebmodal.
+ * Directly opens the Facebook group inside the official Facebook mobile app.
+ * - On Android: targets the Facebook app package directly via fb scheme intent.
+ * - On iOS: uses the fb:// scheme.
+ * - In Facebook/Instagram in-app browser: uses fb://facewebmodal to switch natively to the group.
+ * - Desktop: standard browser navigation.
+ * 
+ * Note: Avoids secondary timeouts or S.browser_fallback_url that cause mobile browsers
+ * to open both the Facebook app and a duplicate Facebook Web tab simultaneously.
  */
 export function openFacebookGroup(): void {
   if (typeof window === 'undefined') return;
 
   const groupUrl = FACEBOOK_GROUP_URL;
 
-  // 1. Inside Facebook in-app browser
+  // 1. Inside Facebook / Messenger / Instagram in-app browser:
+  // Native switch to group view without navigating webview away
   if (isFacebookInAppBrowser()) {
     try {
       window.location.href = `fb://facewebmodal/f?href=${encodeURIComponent(groupUrl)}`;
-      setTimeout(() => {
-        try {
-          window.location.href = groupUrl;
-        } catch {}
-      }, 400);
       return;
     } catch {}
   }
 
-  // 2. On Android mobile (Chrome or other browsers): launch Facebook app directly
+  // 2. On Android mobile (Chrome or other browsers):
+  // Launch the Facebook app directly using scheme=fb so Chrome does NOT also navigate the browser tab to Facebook Web
   if (isAndroidDevice()) {
     try {
-      const intentUrl = `intent://www.facebook.com/groups/chakoshbackup#Intent;scheme=https;package=com.facebook.katana;S.browser_fallback_url=${encodeURIComponent(
+      const intentUrl = `intent://facewebmodal/f?href=${encodeURIComponent(
         groupUrl
-      )};end`;
+      )}#Intent;scheme=fb;package=com.facebook.katana;end`;
       window.location.href = intentUrl;
       return;
     } catch {}
   }
 
-  // 3. On iOS mobile (Safari or other browsers): attempt native scheme with web fallback
+  // 3. On iOS mobile (Safari or other browsers):
+  // Launch the Facebook app directly using fb:// scheme without duplicate web reload
   if (isIOSDevice()) {
     try {
       window.location.href = `fb://facewebmodal/f?href=${encodeURIComponent(groupUrl)}`;
-      setTimeout(() => {
-        try {
-          window.location.href = groupUrl;
-        } catch {}
-      }, 600);
       return;
     } catch {}
   }

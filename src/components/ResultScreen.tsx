@@ -133,7 +133,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       setRedirectCountdown(null);
       openFacebookGroup();
       setPopupNotice(
-        'Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে! সরাসরি না খুললে নিচের "Chakosh Facebook গ্রুপে পোস্ট করুন" বাটনে চাপুন।'
+        'Facebook অ্যাপে গ্রুপটি খোলা হচ্ছে! সরাসরি না খুললে নিচের "Chakosh Facebook গ্রুপে পোস্ট করুন" বাটনে চাপুন।'
       );
       return;
     }
