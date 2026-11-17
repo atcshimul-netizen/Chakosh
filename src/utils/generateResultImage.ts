@@ -14,6 +14,8 @@ export interface GeneratedResultAssets {
   blobUrl: string;
   dataUrl: string;
   filename: string;
+  downloadUrl?: string;
+  id?: string;
 }
 
 // Background template image (Image 2: Clean background template)
@@ -498,14 +500,14 @@ export async function generateResultAssets({
     blob,
     blobUrl,
     dataUrl,
-    filename: 'cha-khor-result.png',
+    filename: 'chakosh-result.png',
   };
 }
 
 /**
  * Checks whether the current browser supports sharing the PNG file via Web Share API.
  */
-export function canShareResultFile(blob: Blob, filename = 'cha-khor-result.png'): boolean {
+export function canShareResultFile(blob: Blob, filename = 'chakosh-result.png'): boolean {
   if (
     typeof navigator === 'undefined' ||
     typeof navigator.canShare !== 'function' ||
@@ -556,7 +558,7 @@ export async function shareResultFile(
  * Triggers standard browser anchor download using a Blob URL.
  * Does not assume the browser actually saved the file (important for in-app browsers).
  */
-export function triggerBrowserDownload(blob: Blob, filename = 'cha-khor-result.png'): void {
+export function triggerBrowserDownload(blob: Blob, filename = 'chakosh-result.png'): void {
   const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = blobUrl;

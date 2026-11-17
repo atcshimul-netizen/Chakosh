@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { registerResultImageRoutes } from './server/resultImageService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -8,6 +9,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const distDir = path.join(__dirname, 'dist');
 const port = Number(process.env.PORT) || 3000;
+
+// Register API routes for temporary result image storage & attachment download
+registerResultImageRoutes(app);
 
 // Serve built static assets at both the configured Vite base path and root
 app.use('/koto-boro-chakhor', express.static(distDir));

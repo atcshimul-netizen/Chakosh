@@ -34,6 +34,7 @@ import {
   attemptOpenInExternalBrowser,
 } from '../utils/browser.ts';
 import { ResultCardView } from './ResultCardView.tsx';
+import { uploadResultImage } from '../utils/api.ts';
 
 interface ResultScreenProps {
   score: number;
@@ -181,20 +182,32 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         playerName,
         profileImageUrl,
       });
-      setGeneratedAssets(assets);
+      const serverRes = await uploadResultImage(assets.blob);
+      setGeneratedAssets({
+        ...assets,
+        downloadUrl: serverRes.downloadUrl,
+        id: serverRes.id,
+      });
       setShowPopup(true);
     } catch (err) {
-      console.error('Failed to generate result image:', err);
+      console.error('Failed to generate or upload result image:', err);
       setGeneratedAssets(null);
-      setGenerationError('দুঃখিত, ফটোকার্ড তৈরি করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
+      setGenerationError('দুঃখিত, ফটোকার্ড প্রস্তুত বা সার্ভারে আপলোড করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
       setShowPopup(true);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handlePopupDownload = () => {
-    if (!generatedAssets) return;
+  const handlePopupDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!generatedAssets) {
+      e.preventDefault();
+      return;
+    }
+    if (redirectCountdown !== null) {
+      e.preventDefault();
+      return;
+    }
     soundEffects.playTap();
     setPopupNotice(null);
     setRedirectCountdown(5);
@@ -376,7 +389,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
           <p className="text-[11px] text-[#8C6D58] flex items-center gap-1.5 pt-0.5">
             <ShieldCheck className="w-3.5 h-3.5 text-[#2D6A4F] shrink-0" />
-            <span>আপনার নাম ও ছবি শুধুমাত্র আপনার ব্রাউজারেই প্রসেস হয়, কোনো সার্ভারে পাঠানো হয় না।</span>
+            <span>ফটোকার্ড ডাউনলোডের জন্য কার্ডের ছবিটি সার্ভারে সাময়িকভাবে সংরক্ষিত হয় এবং ১০ মিনিট পর স্বয়ংক্রিয়ভাবে মুছে যায়।</span>
           </p>
         </div>
       </div>
@@ -495,13 +508,19 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                 {/* Primary Direct Blob Download & Optional Share Actions */}
                 <div className="w-full space-y-2.5 mb-3">
                   <a
-                    href={generatedAssets.blobUrl}
+                    href={generatedAssets.downloadUrl || generatedAssets.blobUrl}
                     download={generatedAssets.filename}
                     onClick={handlePopupDownload}
-                    className="w-full h-12 px-4 rounded-xl bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2] text-sm sm:text-base font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
+                    className={`w-full h-12 px-4 rounded-xl bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2] text-sm sm:text-base font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all ${
+                      redirectCountdown !== null ? 'opacity-85 pointer-events-none' : ''
+                    }`}
                   >
                     <Download className="w-4 h-4 stroke-[2.5]" />
-                    <span>ডাউনলোড করুন</span>
+                    <span>
+                      {redirectCountdown !== null
+                        ? 'ডাউনলোড অনুরোধ পাঠানো হয়েছে...'
+                        : 'ডাউনলোড করুন'}
+                    </span>
                   </a>
 
                   {canNativeShare && (
@@ -534,7 +553,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                         {toBengaliDigits(redirectCountdown)}
                       </div>
                       <p className="text-xs sm:text-sm font-semibold leading-snug">
-                        ফটোকার্ড ডাউনলোড হচ্ছে!{' '}
+                        ফটোকার্ড ডাউনলোডের অনুরোধ পাঠানো হয়েছে!{' '}
                         <span className="text-[#1877F2] font-bold">
                           {toBengaliDigits(redirectCountdown)} সেকেন্ড
                         </span>{' '}

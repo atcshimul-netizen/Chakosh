@@ -1,12 +1,13 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
+import { resultImageVitePlugin } from './server/resultImageService.js';
 
 export default defineConfig(({ command }) => {
   return {
     base: command === 'build' ? '/koto-boro-chakhor/' : '/',
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), resultImageVitePlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
