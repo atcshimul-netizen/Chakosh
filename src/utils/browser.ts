@@ -83,18 +83,19 @@ export function openExternalBrowserWithUrl(url: string): void {
 }
 
 /**
- * Directly opens the Facebook group.
- * When inside the Facebook in-app browser, uses fb://facewebmodal so the Facebook app
- * opens the group directly without getting blocked by Facebook's external redirect filter.
+ * Directly opens the Facebook group inside the official Facebook mobile app whenever possible.
+ * On Android, uses an Android Intent targeting com.facebook.katana with a web fallback.
+ * On iOS, tries the native fb:// scheme before falling back to web.
+ * In the Facebook in-app browser, uses fb://facewebmodal.
  */
 export function openFacebookGroup(): void {
   if (typeof window === 'undefined') return;
 
   const groupUrl = FACEBOOK_GROUP_URL;
 
+  // 1. Inside Facebook in-app browser
   if (isFacebookInAppBrowser()) {
     try {
-      // In Facebook in-app browser, deep link directly to the native Facebook group view
       window.location.href = `fb://facewebmodal/f?href=${encodeURIComponent(groupUrl)}`;
       setTimeout(() => {
         try {
@@ -105,7 +106,31 @@ export function openFacebookGroup(): void {
     } catch {}
   }
 
-  // Standard browser redirect
+  // 2. On Android mobile (Chrome or other browsers): launch Facebook app directly
+  if (isAndroidDevice()) {
+    try {
+      const intentUrl = `intent://www.facebook.com/groups/chakoshbackup#Intent;scheme=https;package=com.facebook.katana;S.browser_fallback_url=${encodeURIComponent(
+        groupUrl
+      )};end`;
+      window.location.href = intentUrl;
+      return;
+    } catch {}
+  }
+
+  // 3. On iOS mobile (Safari or other browsers): attempt native scheme with web fallback
+  if (isIOSDevice()) {
+    try {
+      window.location.href = `fb://facewebmodal/f?href=${encodeURIComponent(groupUrl)}`;
+      setTimeout(() => {
+        try {
+          window.location.href = groupUrl;
+        } catch {}
+      }, 600);
+      return;
+    } catch {}
+  }
+
+  // 4. Standard Desktop / Fallback browser redirect
   try {
     if (window.top && window.top !== window) {
       window.top.location.href = groupUrl;

@@ -249,18 +249,6 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     soundEffects.playTap();
     setPopupNotice(null);
     setRedirectCountdown(5);
-
-    // Also trigger download via hidden iframe so the current page & timer remain 100% active
-    if (generatedAssets.downloadUrl) {
-      let iframe = document.getElementById('download-hidden-iframe') as HTMLIFrameElement | null;
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'download-hidden-iframe';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-      }
-      iframe.src = generatedAssets.downloadUrl;
-    }
   };
 
   const handlePopupShare = async () => {
