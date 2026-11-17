@@ -11,6 +11,7 @@ export interface RenderOptions {
 
 export interface GeneratedResultAssets {
   blob: Blob;
+  blobUrl: string;
   dataUrl: string;
   filename: string;
 }
@@ -491,8 +492,11 @@ export async function generateResultAssets({
     }, 'image/png');
   });
 
+  const blobUrl = URL.createObjectURL(blob);
+
   return {
     blob,
+    blobUrl,
     dataUrl,
     filename: 'cha-khor-result.png',
   };

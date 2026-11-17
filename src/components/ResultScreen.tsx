@@ -15,14 +15,15 @@ import {
   ShieldCheck,
   AlertCircle,
   Users,
+  Clock,
 } from 'lucide-react';
 import { soundEffects } from '../utils/sound.ts';
+import { toBengaliDigits } from '../data/quizData.ts';
 import {
   generateResultAssets,
   processProfileImageFile,
   canShareResultFile,
   shareResultFile,
-  triggerBrowserDownload,
   GeneratedResultAssets,
 } from '../utils/generateResultImage.ts';
 import {
@@ -58,8 +59,9 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState(false);
 
-  // Download / share status inside popup (never assumes automatic download succeeded)
+  // Download / share / 5-second Facebook redirect countdown state
   const [popupNotice, setPopupNotice] = useState<string | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [externalBrowserHint, setExternalBrowserHint] = useState<string | null>(null);
   const [showFallbackHelp, setShowFallbackHelp] = useState(false);
@@ -80,10 +82,54 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     } catch {}
   }, []);
 
+  // Revoke previous Blob URL cleanly when assets change or unmount
+  useEffect(() => {
+    return () => {
+      if (generatedAssets?.blobUrl) {
+        URL.revokeObjectURL(generatedAssets.blobUrl);
+      }
+    };
+  }, [generatedAssets]);
+
   // Invalidate cached photocard if player changes name or photo
   useEffect(() => {
     setGeneratedAssets(null);
+    setRedirectCountdown(null);
   }, [playerName, profileImageUrl, score, personality.level]);
+
+  // Handle 5-second countdown before redirecting to the Facebook group
+  useEffect(() => {
+    if (!showPopup || redirectCountdown === null) return;
+
+    if (redirectCountdown <= 0) {
+      setRedirectCountdown(null);
+      try {
+        if (window.self === window.top) {
+          window.location.assign(FACEBOOK_GROUP_URL);
+        } else {
+          const link = document.createElement('a');
+          link.href = FACEBOOK_GROUP_URL;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } catch {
+        // Fallback notice remains visible below
+      }
+      setPopupNotice(
+        'আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে! অটোমেটিক না খুললে নিচের "Chakosh Facebook গ্রুপে পোস্ট করুন" বাটনে ট্যাপ করুন।'
+      );
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setRedirectCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [showPopup, redirectCountdown]);
 
   const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,11 +161,17 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     setUploadError(null);
   };
 
+  const handleClosePopup = () => {
+    setShowPopup(false);
+    setRedirectCountdown(null);
+  };
+
   const handleGenerateAndOpenPopup = async () => {
     soundEffects.playTap();
     setIsGenerating(true);
     setGenerationError(null);
     setPopupNotice(null);
+    setRedirectCountdown(null);
     setExternalBrowserHint(null);
 
     try {
@@ -144,18 +196,8 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   const handlePopupDownload = () => {
     if (!generatedAssets) return;
     soundEffects.playTap();
-    try {
-      triggerBrowserDownload(generatedAssets.blob, generatedAssets.filename);
-      setPopupNotice(
-        inFacebookBrowser
-          ? 'ডাউনলোডের অনুরোধ পাঠানো হয়েছে এবং Facebook গ্রুপ খোলা হচ্ছে। Facebook ব্রাউজারে ফাইল সেভ না হলে উপরের ছবির ওপর চেপে ধরে "Save Image" ব্যবহার করুন অথবা নিচের Open in External Browser অপশন দেখুন।'
-          : 'ফটোকার্ড ডাউনলোড শুরু হয়েছে এবং আপনাকে সরাসরি আমাদের Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে। ডাউনলোড না হলে এই ট্যাবে ফিরে এসে ছবিটি চেপে ধরে "Save Image" করুন।'
-      );
-    } catch {
-      setPopupNotice(
-        'সরাসরি ডাউনলোড শুরু করা যায়নি। দয়া করে উপরের ছবির ওপর চেপে ধরে "Save Image" ব্যবহার করুন বা শেয়ার অপশন চেষ্টা করুন।'
-      );
-    }
+    setPopupNotice(null);
+    setRedirectCountdown(5);
   };
 
   const handlePopupShare = async () => {
@@ -413,7 +455,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       {showPopup && (
         <div
           className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn"
-          onClick={() => setShowPopup(false)}
+          onClick={handleClosePopup}
         >
           <div
             className="bg-[#FAF7F2] rounded-2xl max-w-md w-full p-4 sm:p-5 relative shadow-2xl border border-[#E3D4C1] flex flex-col items-center max-h-[92vh] overflow-y-auto"
@@ -421,7 +463,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
           >
             <button
               type="button"
-              onClick={() => setShowPopup(false)}
+              onClick={handleClosePopup}
               className="absolute top-3 right-3 p-1.5 rounded-full bg-[#EAE0D2] hover:bg-[#DFCDBB] text-[#5C2C16] cursor-pointer"
               title="বন্ধ করুন"
               aria-label="পপআপ বন্ধ করুন"
@@ -445,17 +487,16 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                 </div>
 
                 <p className="text-xs text-center text-[#7C5A43] mb-3">
-                  ডাউনলোডে ক্লিক করলে ছবি ডাউনলোডের পাশাপাশি আপনাকে সরাসরি Facebook গ্রুপে নিয়ে যাওয়া হবে। অটোমেটিক সেভ না হলে ছবিটি চেপে ধরে{' '}
+                  ডাউনলোডে ক্লিক করলে ছবি ডাউনলোড শুরু হবে এবং ৫ সেকেন্ড পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হবে। অটোমেটিক সেভ না হলে ছবিটি চেপে ধরে{' '}
                   <strong>&quot;Save Image&quot;</strong> /{' '}
                   <strong>&quot;Download image&quot;</strong> করুন।
                 </p>
 
-                {/* Primary Download (+ Direct Facebook Group) & Optional Share Actions */}
+                {/* Primary Direct Blob Download & Optional Share Actions */}
                 <div className="w-full space-y-2.5 mb-3">
                   <a
-                    href={FACEBOOK_GROUP_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={generatedAssets.blobUrl}
+                    download={generatedAssets.filename}
                     onClick={handlePopupDownload}
                     className="w-full h-12 px-4 rounded-xl bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2] text-sm sm:text-base font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
                   >
@@ -484,6 +525,57 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                     </button>
                   )}
                 </div>
+
+                {/* 5-Second Redirect Countdown Banner */}
+                {redirectCountdown !== null && redirectCountdown > 0 && (
+                  <div className="w-full mb-3 p-3.5 rounded-xl bg-[#EEF5FF] border border-[#B9D4FA] text-[#1E3A5F] space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#1877F2] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                        {toBengaliDigits(redirectCountdown)}
+                      </div>
+                      <p className="text-xs sm:text-sm font-semibold leading-snug">
+                        ফটোকার্ড ডাউনলোড হচ্ছে!{' '}
+                        <span className="text-[#1877F2] font-bold">
+                          {toBengaliDigits(redirectCountdown)} সেকেন্ড
+                        </span>{' '}
+                        পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে...
+                      </p>
+                    </div>
+
+                    <div className="w-full h-1.5 bg-[#D4E4FC] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#1877F2] rounded-full transition-all duration-1000 ease-linear"
+                        style={{ width: `${((6 - redirectCountdown) / 5) * 100}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-0.5">
+                      <a
+                        href={FACEBOOK_GROUP_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                          soundEffects.playTap();
+                          setRedirectCountdown(null);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#1877F2] hover:underline"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>এখনই গ্রুপে যান</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEffects.playTap();
+                          setRedirectCountdown(null);
+                        }}
+                        className="text-xs font-semibold text-[#5C2C16] hover:text-[#381B0E] px-2 py-1 rounded-md bg-white/80 border border-[#D4E4FC] cursor-pointer"
+                      >
+                        বাতিল করুন
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {popupNotice && (
                   <div className="w-full mb-3 p-3 rounded-xl bg-[#FFF8EB] border border-[#EBD2AA] text-xs text-[#6E4733] leading-relaxed">
