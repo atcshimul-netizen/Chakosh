@@ -87,8 +87,6 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
   const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    // Reset input value so the same file can be re-selected if removed
-    e.target.value = '';
     if (!file) return;
 
     setUploadError(null);
@@ -104,6 +102,9 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
           : 'ছবিটি প্রসেস করতে সমস্যা হয়েছে। দয়া করে অন্য একটি ছবি চেষ্টা করুন।';
       setUploadError(msg);
     } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       setIsProcessingPhoto(false);
     }
   };
@@ -147,8 +148,8 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       triggerBrowserDownload(generatedAssets.blob, generatedAssets.filename);
       setPopupNotice(
         inFacebookBrowser
-          ? 'ডাউনলোডের অনুরোধ পাঠানো হয়েছে। Facebook ব্রাউজারে ফাইল সেভ না হলে উপরের ছবির ওপর চেপে ধরে "Save Image" ব্যবহার করুন অথবা নিচের Open in External Browser অপশন দেখুন।'
-          : 'ডাউনলোডের অনুরোধ পাঠানো হয়েছে। আপনার ব্রাউজার অটোমেটিক সেভ সীমিত করলে উপরের ছবিটি চেপে ধরে বা রাইট-ক্লিক করে "Save Image" করুন।'
+          ? 'ডাউনলোডের অনুরোধ পাঠানো হয়েছে এবং Facebook গ্রুপ খোলা হচ্ছে। Facebook ব্রাউজারে ফাইল সেভ না হলে উপরের ছবির ওপর চেপে ধরে "Save Image" ব্যবহার করুন অথবা নিচের Open in External Browser অপশন দেখুন।'
+          : 'ফটোকার্ড ডাউনলোড শুরু হয়েছে এবং আপনাকে সরাসরি আমাদের Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে। ডাউনলোড না হলে এই ট্যাবে ফিরে এসে ছবিটি চেপে ধরে "Save Image" করুন।'
       );
     } catch {
       setPopupNotice(
@@ -207,7 +208,13 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   return (
     <div className="w-full max-w-xl mx-auto px-4 py-6 sm:py-8 flex flex-col items-center">
       {/* 1. Reusable On-Screen Result Card */}
-      <ResultCardView score={score} personality={personality} isExportMode={false} />
+      <ResultCardView
+        score={score}
+        personality={personality}
+        isExportMode={false}
+        playerName={playerName}
+        profileImageUrl={profileImageUrl}
+      />
 
       {/* 2. Optional Photocard Personalisation Card */}
       <div className="w-full bg-white border border-[#E7D6C3] rounded-2xl p-4 sm:p-5 mb-5 shadow-xs">
@@ -236,7 +243,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                 onChange={(e) => setPlayerName(e.target.value)}
                 maxLength={40}
                 placeholder="যেমন: তানভীর আহমেদ"
-                className="w-full h-11 pl-9 pr-9 rounded-xl border border-[#DFCBB5] bg-[#FAF7F2] text-sm text-[#2C1810] placeholder:text-[#A88C78] focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:bg-white transition-colors"
+                className="w-full h-11 pl-9 pr-9 rounded-xl border border-[#DFCBB5] bg-[#FAF7F2] text-base sm:text-sm text-[#2C1810] placeholder:text-[#A88C78] focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:bg-white transition-colors"
               />
               {playerName && (
                 <button
@@ -429,7 +436,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
             {/* Photocard Preview or Generation Error */}
             {generatedAssets ? (
               <>
-                <div className="w-full rounded-xl overflow-hidden border border-[#D8C7B5] shadow-xs aspect-[4/5] bg-white mb-2.5">
+                <div className="w-full max-w-[300px] sm:max-w-[340px] mx-auto rounded-xl overflow-hidden border border-[#D8C7B5] shadow-xs aspect-[4/5] bg-white mb-2.5">
                   <img
                     src={generatedAssets.dataUrl}
                     alt="চা-খোর রেজাল্ট কার্ড"
@@ -438,21 +445,23 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                 </div>
 
                 <p className="text-xs text-center text-[#7C5A43] mb-3">
-                  স্বয়ংক্রিয়ভাবে ডাউনলোড না হলে ছবিটি চেপে ধরে{' '}
+                  ডাউনলোডে ক্লিক করলে ছবি ডাউনলোডের পাশাপাশি আপনাকে সরাসরি Facebook গ্রুপে নিয়ে যাওয়া হবে। অটোমেটিক সেভ না হলে ছবিটি চেপে ধরে{' '}
                   <strong>&quot;Save Image&quot;</strong> /{' '}
-                  <strong>&quot;Download image&quot;</strong> নির্বাচন করতে পারেন।
+                  <strong>&quot;Download image&quot;</strong> করুন।
                 </p>
 
-                {/* Primary Download & Optional Share Actions */}
+                {/* Primary Download (+ Direct Facebook Group) & Optional Share Actions */}
                 <div className="w-full space-y-2.5 mb-3">
-                  <button
-                    type="button"
+                  <a
+                    href={FACEBOOK_GROUP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     onClick={handlePopupDownload}
                     className="w-full h-12 px-4 rounded-xl bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2] text-sm sm:text-base font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
                   >
                     <Download className="w-4 h-4 stroke-[2.5]" />
                     <span>ডাউনলোড করুন</span>
-                  </button>
+                  </a>
 
                   {canNativeShare && (
                     <button

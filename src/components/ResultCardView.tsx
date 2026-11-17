@@ -9,16 +9,21 @@ export interface ResultCardViewProps {
   score: number;
   personality: Personality;
   isExportMode?: boolean;
+  playerName?: string;
+  profileImageUrl?: string | null;
 }
 
 export const ResultCardView: React.FC<ResultCardViewProps> = ({
   score,
   personality,
   isExportMode = false,
+  playerName,
+  profileImageUrl,
 }) => {
   const logoSrc = getPublicAssetUrl('assets/aistudio/CHAKOSH_LOGO_LQ_56c97d99.png');
   const bengaliScore = toBengaliDigits(score);
   const scorePercent = Math.min(100, Math.max(0, score));
+  const cleanName = (playerName || '').trim();
 
   // If rendering for 1080 x 1350 px export
   if (isExportMode) {
@@ -51,13 +56,25 @@ export const ResultCardView: React.FC<ResultCardViewProps> = ({
           <div className="absolute -top-16 -right-16 w-56 h-56 bg-[#F59E0B]/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-[#8B4513]/10 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Large Personality Emoji & Badge */}
+          {/* Large Personality Emoji / Profile Photo & Badge */}
           <div className="relative inline-block mb-4">
-            <div className="w-36 h-36 mx-auto rounded-[30px] bg-white border-2 border-[#E2CEBC] shadow-inner flex items-center justify-center text-7xl p-3">
-              {personality.emoji}
+            <div
+              className={`w-36 h-36 mx-auto rounded-[30px] bg-white border-2 border-[#E2CEBC] shadow-inner flex items-center justify-center text-7xl overflow-hidden select-none ${
+                profileImageUrl ? 'p-0' : 'p-3'
+              }`}
+            >
+              {profileImageUrl ? (
+                <img
+                  src={profileImageUrl}
+                  alt={cleanName || 'প্রোফাইল ছবি'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                personality.emoji
+              )}
             </div>
-            <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#5C2C16] text-[#FDE68A] text-base font-bold px-5 py-1 rounded-full whitespace-nowrap shadow-xs">
-              লেভেল {toBengaliDigits(personality.level)}
+            <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#5C2C16] text-[#FDE68A] text-base font-bold px-5 py-1 rounded-full whitespace-nowrap shadow-xs max-w-[360px] truncate">
+              {cleanName || `লেভেল ${toBengaliDigits(personality.level)}`}
             </span>
           </div>
 
@@ -144,13 +161,25 @@ export const ResultCardView: React.FC<ResultCardViewProps> = ({
         <div className="absolute -top-12 -right-12 w-36 h-36 bg-[#F59E0B]/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-[#8B4513]/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Large Personality Emoji & Badge */}
+        {/* Large Personality Emoji / Profile Photo & Badge */}
         <div className="relative inline-block mb-3">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-3xl bg-white border-2 border-[#E2CEBC] shadow-inner flex items-center justify-center text-5xl sm:text-6xl p-2 select-none">
-            {personality.emoji}
+          <div
+            className={`w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-3xl bg-white border-2 border-[#E2CEBC] shadow-inner flex items-center justify-center text-5xl sm:text-6xl overflow-hidden select-none ${
+              profileImageUrl ? 'p-0' : 'p-2'
+            }`}
+          >
+            {profileImageUrl ? (
+              <img
+                src={profileImageUrl}
+                alt={cleanName || 'প্রোফাইল ছবি'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              personality.emoji
+            )}
           </div>
-          <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-[#5C2C16] text-[#FDE68A] text-xs font-bold px-3 py-0.5 rounded-full whitespace-nowrap shadow-xs">
-            লেভেল {toBengaliDigits(personality.level)}
+          <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-[#5C2C16] text-[#FDE68A] text-xs font-bold px-3.5 py-0.5 rounded-full whitespace-nowrap shadow-xs max-w-[230px] sm:max-w-[280px] truncate">
+            {cleanName || `লেভেল ${toBengaliDigits(personality.level)}`}
           </span>
         </div>
 
