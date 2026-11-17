@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Users,
   Clock,
+  Globe,
 } from 'lucide-react';
 import { soundEffects } from '../utils/sound.ts';
 import { toBengaliDigits } from '../data/quizData.ts';
@@ -27,11 +28,11 @@ import {
   GeneratedResultAssets,
 } from '../utils/generateResultImage.ts';
 import {
-  FACEBOOK_GROUP_URL,
   isFacebookInAppBrowser,
-  isIOSDevice,
   isAndroidDevice,
-  attemptOpenInExternalBrowser,
+  openFacebookGroup,
+  buildResultShareUrl,
+  openExternalBrowserWithUrl,
 } from '../utils/browser.ts';
 import { ResultCardView } from './ResultCardView.tsx';
 import { uploadResultImage } from '../utils/api.ts';
@@ -40,15 +41,21 @@ interface ResultScreenProps {
   score: number;
   personality: Personality;
   onRestart: () => void;
+  initialPlayerName?: string;
+  initialResultId?: string | null;
+  autoOpenPopup?: boolean;
 }
 
 export const ResultScreen: React.FC<ResultScreenProps> = ({
   score,
   personality,
   onRestart,
+  initialPlayerName = '',
+  initialResultId = null,
+  autoOpenPopup = false,
 }) => {
   // Optional personalisation state (client-side only)
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(initialPlayerName);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
@@ -64,11 +71,8 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   const [popupNotice, setPopupNotice] = useState<string | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [isSharing, setIsSharing] = useState(false);
-  const [externalBrowserHint, setExternalBrowserHint] = useState<string | null>(null);
-  const [showFallbackHelp, setShowFallbackHelp] = useState(false);
 
-  const inFacebookBrowser = isFacebookInAppBrowser();
-  const isIOS = isIOSDevice();
+  const isFbBrowser = isFacebookInAppBrowser();
   const isAndroid = isAndroidDevice();
 
   useEffect(() => {
@@ -86,16 +90,39 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   // Revoke previous Blob URL cleanly when assets change or unmount
   useEffect(() => {
     return () => {
-      if (generatedAssets?.blobUrl) {
+      if (generatedAssets?.blobUrl && generatedAssets.blobUrl.startsWith('blob:')) {
         URL.revokeObjectURL(generatedAssets.blobUrl);
       }
     };
   }, [generatedAssets]);
 
+  // If initialResultId is provided (e.g. redirected from Facebook to Chrome),
+  // initialize the download assets and automatically open the download popup.
+  useEffect(() => {
+    if (initialResultId && !generatedAssets) {
+      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+      const downloadUrl = `${window.location.origin}${base}/api/download/${initialResultId}`;
+      const imageUrl = `${window.location.origin}${base}/api/image/${initialResultId}`;
+      setGeneratedAssets({
+        blob: null as any,
+        blobUrl: imageUrl,
+        dataUrl: imageUrl,
+        filename: 'chakosh-result.png',
+        downloadUrl,
+        id: initialResultId,
+      });
+      if (autoOpenPopup) {
+        setShowPopup(true);
+      }
+    }
+  }, [initialResultId, autoOpenPopup]);
+
   // Invalidate cached photocard if player changes name or photo
   useEffect(() => {
-    setGeneratedAssets(null);
-    setRedirectCountdown(null);
+    if (!initialResultId) {
+      setGeneratedAssets(null);
+      setRedirectCountdown(null);
+    }
   }, [playerName, profileImageUrl, score, personality.level]);
 
   // Handle 5-second countdown before redirecting to the Facebook group
@@ -104,23 +131,9 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
     if (redirectCountdown <= 0) {
       setRedirectCountdown(null);
-      try {
-        if (window.self === window.top) {
-          window.location.assign(FACEBOOK_GROUP_URL);
-        } else {
-          const link = document.createElement('a');
-          link.href = FACEBOOK_GROUP_URL;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-      } catch {
-        // Fallback notice remains visible below
-      }
+      openFacebookGroup();
       setPopupNotice(
-        'আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে! অটোমেটিক না খুললে নিচের "Chakosh Facebook গ্রুপে পোস্ট করুন" বাটনে ট্যাপ করুন।'
+        'Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে! সরাসরি না খুললে নিচের "Chakosh Facebook গ্রুপে পোস্ট করুন" বাটনে চাপুন।'
       );
       return;
     }
@@ -173,7 +186,6 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     setGenerationError(null);
     setPopupNotice(null);
     setRedirectCountdown(null);
-    setExternalBrowserHint(null);
 
     try {
       const assets = await generateResultAssets({
@@ -188,6 +200,17 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         downloadUrl: serverRes.downloadUrl,
         id: serverRes.id,
       });
+
+      // Update current browser URL with deep-link state so external browser / Safari menu uses it
+      try {
+        const shareUrl = buildResultShareUrl({
+          score,
+          playerName,
+          resultId: serverRes.id,
+        });
+        window.history.replaceState(null, '', shareUrl);
+      } catch {}
+
       setShowPopup(true);
     } catch (err) {
       console.error('Failed to generate or upload result image:', err);
@@ -197,6 +220,21 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleOpenInChrome = () => {
+    soundEffects.playTap();
+    const resultUrl = buildResultShareUrl({
+      score,
+      playerName,
+      resultId: generatedAssets?.id || undefined,
+    });
+
+    try {
+      window.history.replaceState(null, '', resultUrl);
+    } catch {}
+
+    openExternalBrowserWithUrl(resultUrl);
   };
 
   const handlePopupDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -211,10 +249,22 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     soundEffects.playTap();
     setPopupNotice(null);
     setRedirectCountdown(5);
+
+    // Also trigger download via hidden iframe so the current page & timer remain 100% active
+    if (generatedAssets.downloadUrl) {
+      let iframe = document.getElementById('download-hidden-iframe') as HTMLIFrameElement | null;
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'download-hidden-iframe';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+      }
+      iframe.src = generatedAssets.downloadUrl;
+    }
   };
 
   const handlePopupShare = async () => {
-    if (!generatedAssets) return;
+    if (!generatedAssets || !generatedAssets.blob) return;
     soundEffects.playTap();
     setIsSharing(true);
     setPopupNotice(null);
@@ -238,25 +288,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     }
   };
 
-  const handleOpenExternalBrowser = () => {
-    soundEffects.playTap();
-    const outcome = attemptOpenInExternalBrowser();
-    if (outcome === 'ios-manual') {
-      setExternalBrowserHint(
-        'iPhone-এ Facebook অ্যাপের ভেতর থেকে ওয়েবসাইট সরাসরি Safari খুলতে পারে না। অনুগ্রহ করে স্ক্রিনের নিচে বা উপরে থাকা মেনু (•••) আইকনে ট্যাপ করে "Open in Safari" বা "Open in External Browser" নির্বাচন করুন।'
-      );
-    } else if (outcome === 'android-intent') {
-      setExternalBrowserHint(
-        'বাইরের ব্রাউজারে (Chrome) খোলার চেষ্টা করা হচ্ছে। না খুললে উপরের ডানদিকের ⋮ মেনু থেকে "Open in Chrome / External Browser" নির্বাচন করুন।'
-      );
-    } else {
-      setExternalBrowserHint(
-        'বাইরের ব্রাউজারে খোলার চেষ্টা করা হয়েছে। না খুললে আপনার ব্রাউজার মেনু থেকে "Open in External Browser" নির্বাচন করে পেজটি খুলুন।'
-      );
-    }
-  };
-
-  const canNativeShare = generatedAssets
+  const canNativeShare = generatedAssets && generatedAssets.blob
     ? canShareResultFile(generatedAssets.blob, generatedAssets.filename)
     : false;
 
@@ -403,7 +435,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
           className={`w-full h-14 px-6 rounded-xl font-bold text-base sm:text-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B4513] ${
             isGenerating || isProcessingPhoto
               ? 'bg-[#E5DACB] text-[#8C6D58] cursor-wait'
-              : 'bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFFBF5]'
+              : 'bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2]'
           }`}
         >
           {isGenerating ? (
@@ -452,16 +484,17 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         <p className="text-base sm:text-lg font-bold text-[#381B0E] mb-3">
           আপনার ফলাফলটি আমাদের Facebook গ্রুপে শেয়ার করুন!
         </p>
-        <a
-          href={FACEBOOK_GROUP_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => soundEffects.playTap()}
-          className="inline-flex items-center justify-center gap-2 w-full max-w-xs h-12 px-5 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white font-bold text-sm sm:text-base shadow-sm transition-all"
+        <button
+          type="button"
+          onClick={() => {
+            soundEffects.playTap();
+            openFacebookGroup();
+          }}
+          className="inline-flex items-center justify-center gap-2 w-full max-w-xs h-12 px-5 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white font-bold text-sm sm:text-base shadow-sm transition-all cursor-pointer"
         >
           <span>গ্রুপে পোস্ট করুন</span>
           <ExternalLink className="w-4 h-4" />
-        </a>
+        </button>
       </div>
 
       {/* 5. Photocard Preview / Download Popup */}
@@ -484,124 +517,207 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-base sm:text-lg font-bold text-[#381B0E] mb-3 pr-6 text-center">
-              আপনার চা-খোর ফটোকার্ড
-            </h3>
-
             {/* Photocard Preview or Generation Error */}
             {generatedAssets ? (
-              <>
-                <div className="w-full max-w-[300px] sm:max-w-[340px] mx-auto rounded-xl overflow-hidden border border-[#D8C7B5] shadow-xs aspect-[4/5] bg-white mb-2.5">
-                  <img
-                    src={generatedAssets.dataUrl}
-                    alt="চা-খোর রেজাল্ট কার্ড"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
+              isFbBrowser ? (
+                /* Facebook In-App Browser Experience (Directly inspired by reference screenshot) */
+                <div className="w-full flex flex-col items-center text-center px-1 pt-2">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1E293B] mb-2 tracking-tight">
+                    আপনার ফটোকার্ড তৈরি!
+                  </h2>
 
-                <p className="text-xs text-center text-[#7C5A43] mb-3">
-                  ডাউনলোডে ক্লিক করলে ছবি ডাউনলোড শুরু হবে এবং ৫ সেকেন্ড পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হবে। অটোমেটিক সেভ না হলে ছবিটি চেপে ধরে{' '}
-                  <strong>&quot;Save Image&quot;</strong> /{' '}
-                  <strong>&quot;Download image&quot;</strong> করুন।
-                </p>
+                  <p className="text-xs sm:text-sm text-[#475569] leading-relaxed mb-5 max-w-sm">
+                    Facebook/Instagram-এর ভেতরের ব্রাউজারে সরাসরি ডাউনলোড হয় না। নিচের যেকোনো একটি উপায়ে সেভ করুন:
+                  </p>
 
-                {/* Primary Direct Blob Download & Optional Share Actions */}
-                <div className="w-full space-y-2.5 mb-3">
-                  <a
-                    href={generatedAssets.downloadUrl || generatedAssets.blobUrl}
-                    download={generatedAssets.filename}
-                    onClick={handlePopupDownload}
-                    className={`w-full h-12 px-4 rounded-xl bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2] text-sm sm:text-base font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all ${
-                      redirectCountdown !== null ? 'opacity-85 pointer-events-none' : ''
-                    }`}
+                  {/* Primary Big Green Action Button */}
+                  <button
+                    type="button"
+                    onClick={handleOpenInChrome}
+                    className="w-full py-3.5 px-5 rounded-2xl bg-[#0F6048] hover:bg-[#0B4D39] active:scale-[0.98] text-white font-bold text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-md cursor-pointer transition-all"
                   >
-                    <Download className="w-4 h-4 stroke-[2.5]" />
-                    <span>
-                      {redirectCountdown !== null
-                        ? 'ডাউনলোড অনুরোধ পাঠানো হয়েছে...'
-                        : 'ডাউনলোড করুন'}
-                    </span>
-                  </a>
+                    <Globe className="w-5 h-5 shrink-0" />
+                    <span>{isAndroid ? 'Chrome-এ খুলে ডাউনলোড করুন' : 'Safari / ব্রাউজারে খুলে ডাউনলোড করুন'}</span>
+                  </button>
 
-                  {canNativeShare && (
-                    <button
-                      type="button"
-                      onClick={handlePopupShare}
-                      disabled={isSharing}
-                      className="w-full h-11 px-4 rounded-xl bg-white hover:bg-[#FDFBF7] border border-[#D5C2AF] active:scale-[0.98] text-[#5C2C16] text-sm font-bold flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition-all"
-                    >
-                      {isSharing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>শেয়ার অপশন খুলছে...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Share2 className="w-4 h-4 text-[#8B4513]" />
-                          <span>শেয়ার বা সেভ করুন</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
+                  <p className="text-[11px] sm:text-xs text-[#64748B] mt-2.5 mb-5 leading-relaxed max-w-sm">
+                    আপনার রেজাল্ট ও নাম সাথেই যাবে। না খুললে: ওপরের বা নিচের{' '}
+                    <span className="font-bold tracking-widest">•••</span> মেনু থেকে{' '}
+                    <strong>Open in Chrome / external browser</strong> চাপুন।
+                  </p>
 
-                {/* 5-Second Redirect Countdown Banner */}
-                {redirectCountdown !== null && redirectCountdown > 0 && (
-                  <div className="w-full mb-3 p-3.5 rounded-xl bg-[#EEF5FF] border border-[#B9D4FA] text-[#1E3A5F] space-y-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#1877F2] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-2xs">
-                        {toBengaliDigits(redirectCountdown)}
-                      </div>
-                      <p className="text-xs sm:text-sm font-semibold leading-snug">
-                        ফটোকার্ড ডাউনলোডের অনুরোধ পাঠানো হয়েছে!{' '}
-                        <span className="text-[#1877F2] font-bold">
-                          {toBengaliDigits(redirectCountdown)} সেকেন্ড
-                        </span>{' '}
-                        পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে...
-                      </p>
-                    </div>
+                  {/* Option 2: Long press manual save fallback */}
+                  <div className="w-full border-t border-[#E2E8F0] pt-4 mb-2 text-center">
+                    <p className="text-xs sm:text-sm font-semibold text-[#64748B] mb-2.5">
+                      অথবা: নিচের ছবিটিতে চেপে ধরে সেভ করুন:
+                    </p>
 
-                    <div className="w-full h-1.5 bg-[#D4E4FC] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#1877F2] rounded-full transition-all duration-1000 ease-linear"
-                        style={{ width: `${((6 - redirectCountdown) / 5) * 100}%` }}
+                    <div className="w-full max-w-[280px] sm:max-w-[320px] mx-auto rounded-xl overflow-hidden border border-[#CBD5E1] shadow-xs aspect-[4/5] bg-white mb-2.5">
+                      <img
+                        src={generatedAssets.dataUrl}
+                        alt="চা-খোর রেজাল্ট কার্ড"
+                        className="w-full h-full object-contain"
                       />
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 pt-0.5">
-                      <a
-                        href={FACEBOOK_GROUP_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => {
-                          soundEffects.playTap();
-                          setRedirectCountdown(null);
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#1877F2] hover:underline"
-                      >
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>এখনই গ্রুপে যান</span>
-                      </a>
+                    <p className="text-xs text-[#64748B] mb-3">
+                      ছবির ওপর চেপে ধরে <strong>&quot;Save Image&quot;</strong> বা{' '}
+                      <strong>&quot;Download image&quot;</strong> করুন।
+                    </p>
+                  </div>
+
+                  {/* Direct Facebook Group button */}
+                  <div className="w-full pt-3 border-t border-[#E6D6C3] text-center space-y-2">
+                    <p className="text-xs sm:text-sm font-bold text-[#381B0E]">
+                      আপনার চায়ের ব্যক্তিত্ব গ্রুপে শেয়ার করুন!
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playTap();
+                        openFacebookGroup();
+                      }}
+                      className="w-full h-11 px-4 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                    >
+                      <span>Chakosh Facebook গ্রুপে পোস্ট করুন</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Standard External Browser / Chrome / Safari Experience */
+                <>
+                  <h3 className="text-base sm:text-lg font-bold text-[#381B0E] mb-3 pr-6 text-center">
+                    আপনার চা-খোর ফটোকার্ড
+                  </h3>
+
+                  <div className="w-full max-w-[300px] sm:max-w-[340px] mx-auto rounded-xl overflow-hidden border border-[#D8C7B5] shadow-xs aspect-[4/5] bg-white mb-2.5">
+                    <img
+                      src={generatedAssets.dataUrl}
+                      alt="চা-খোর রেজাল্ট কার্ড"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  <p className="text-xs text-center text-[#7C5A43] mb-3">
+                    ডাউনলোডে ক্লিক করলে ছবি ডাউনলোড শুরু হবে এবং ৫ সেকেন্ড পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হবে।
+                  </p>
+
+                  {/* Primary Direct HTTPS Download & Optional Share Actions */}
+                  <div className="w-full space-y-2.5 mb-3">
+                    <a
+                      href={generatedAssets.downloadUrl || generatedAssets.blobUrl}
+                      download={generatedAssets.filename}
+                      onClick={handlePopupDownload}
+                      className={`w-full h-12 px-4 rounded-xl bg-gradient-to-r from-[#D97706] via-[#B45309] to-[#8B4513] hover:from-[#B45309] hover:to-[#78350F] active:scale-[0.98] text-[#FFF9F2] text-sm sm:text-base font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all ${
+                        redirectCountdown !== null ? 'opacity-85 pointer-events-none' : ''
+                      }`}
+                    >
+                      <Download className="w-4 h-4 stroke-[2.5]" />
+                      <span>
+                        {redirectCountdown !== null
+                          ? 'ডাউনলোড অনুরোধ পাঠানো হয়েছে...'
+                          : 'ডাউনলোড করুন'}
+                      </span>
+                    </a>
+
+                    {canNativeShare && (
                       <button
                         type="button"
-                        onClick={() => {
-                          soundEffects.playTap();
-                          setRedirectCountdown(null);
-                        }}
-                        className="text-xs font-semibold text-[#5C2C16] hover:text-[#381B0E] px-2 py-1 rounded-md bg-white/80 border border-[#D4E4FC] cursor-pointer"
+                        onClick={handlePopupShare}
+                        disabled={isSharing}
+                        className="w-full h-11 px-4 rounded-xl bg-white hover:bg-[#FDFBF7] border border-[#D5C2AF] active:scale-[0.98] text-[#5C2C16] text-sm font-bold flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition-all"
                       >
-                        বাতিল করুন
+                        {isSharing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>শেয়ার অপশন খুলছে...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-4 h-4 text-[#8B4513]" />
+                            <span>শেয়ার বা সেভ করুন</span>
+                          </>
+                        )}
                       </button>
-                    </div>
+                    )}
                   </div>
-                )}
 
-                {popupNotice && (
-                  <div className="w-full mb-3 p-3 rounded-xl bg-[#FFF8EB] border border-[#EBD2AA] text-xs text-[#6E4733] leading-relaxed">
-                    {popupNotice}
+                  {/* 5-Second Redirect Countdown Banner */}
+                  {redirectCountdown !== null && redirectCountdown > 0 && (
+                    <div className="w-full mb-3 p-3.5 rounded-xl bg-[#EEF5FF] border border-[#B9D4FA] text-[#1E3A5F] space-y-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#1877F2] text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                          {toBengaliDigits(redirectCountdown)}
+                        </div>
+                        <p className="text-xs sm:text-sm font-semibold leading-snug">
+                          ফটোকার্ড ডাউনলোডের অনুরোধ পাঠানো হয়েছে!{' '}
+                          <span className="text-[#1877F2] font-bold">
+                            {toBengaliDigits(redirectCountdown)} সেকেন্ড
+                          </span>{' '}
+                          পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হচ্ছে...
+                        </p>
+                      </div>
+
+                      <div className="w-full h-1.5 bg-[#D4E4FC] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#1877F2] rounded-full transition-all duration-1000 ease-linear"
+                          style={{ width: `${((6 - redirectCountdown) / 5) * 100}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEffects.playTap();
+                            setRedirectCountdown(null);
+                            openFacebookGroup();
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-[#1877F2] hover:underline cursor-pointer"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>এখনই গ্রুপে যান</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundEffects.playTap();
+                            setRedirectCountdown(null);
+                          }}
+                          className="text-xs font-semibold text-[#5C2C16] hover:text-[#381B0E] px-2 py-1 rounded-md bg-white/80 border border-[#D4E4FC] cursor-pointer"
+                        >
+                          বাতিল করুন
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {popupNotice && (
+                    <div className="w-full mb-3 p-3 rounded-xl bg-[#FFF8EB] border border-[#EBD2AA] text-xs text-[#6E4733] leading-relaxed">
+                      {popupNotice}
+                    </div>
+                  )}
+
+                  {/* Always-Visible Facebook Group Invitation in Popup */}
+                  <div className="w-full pt-3 border-t border-[#E6D6C3] text-center space-y-2.5">
+                    <p className="text-sm font-bold text-[#381B0E]">
+                      আপনার চায়ের ব্যক্তিত্ব সবার সঙ্গে শেয়ার করুন!
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playTap();
+                        openFacebookGroup();
+                      }}
+                      className="w-full h-11 px-4 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                    >
+                      <span>Chakosh Facebook গ্রুপে পোস্ট করুন</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
-              </>
+                </>
+              )
             ) : (
               <div className="w-full p-4 rounded-xl bg-rose-50 border border-rose-200 text-center mb-4">
                 <AlertCircle className="w-7 h-7 text-rose-600 mx-auto mb-2" />
@@ -617,74 +733,6 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                 </button>
               </div>
             )}
-
-            {/* Facebook In-App Browser / Restricted Browser Fallback Section */}
-            {!inFacebookBrowser && !showFallbackHelp && (
-              <button
-                type="button"
-                onClick={() => setShowFallbackHelp(true)}
-                className="mb-3 text-xs text-[#8B4513] hover:text-[#5C2C16] underline cursor-pointer"
-              >
-                ডাউনলোড করতে সমস্যা হচ্ছে?
-              </button>
-            )}
-
-            {(inFacebookBrowser || showFallbackHelp) && (
-              <div className="w-full mb-4 p-3.5 rounded-xl bg-amber-50/90 border border-amber-300 text-left space-y-2.5">
-                <p className="text-xs font-bold text-[#5C2C16]">
-                  {inFacebookBrowser
-                    ? 'Facebook ব্রাউজার থেকে ডাউনলোডে সমস্যা হলে:'
-                    : 'অটোমেটিক ডাউনলোড সীমিত হলে:'}
-                </p>
-                {isIOS ? (
-                  <p className="text-xs text-[#6E4733] leading-relaxed">
-                    iPhone-এ Facebook বা ইন-অ্যাপ ব্রাউজার থেকে সরাসরি ডাউনলোড সীমিত হতে পারে। স্ক্রিনের নিচে বা উপরে থাকা মেনু (<strong>•••</strong>) আইকনে ট্যাপ করে{' '}
-                    <strong>Open in Safari</strong> বা{' '}
-                    <strong>Open in External Browser</strong> বেছে নিন, অথবা উপরের ছবির ওপর চেপে ধরে ম্যানুয়ালি সেভ করুন।
-                  </p>
-                ) : isAndroid ? (
-                  <p className="text-xs text-[#6E4733] leading-relaxed">
-                    ইন-অ্যাপ ব্রাউজার থেকে ডাউনলোড না হলে নিচের বাটনে ট্যাপ করে Chrome বা বাইরের ব্রাউজারে খুলুন, অথবা উপরের ছবিটি চেপে ধরে ম্যানুয়ালি সেভ করুন।
-                  </p>
-                ) : (
-                  <p className="text-xs text-[#6E4733] leading-relaxed">
-                    অটোমেটিক ডাউনলোড কাজ না করলে বাইরের ব্রাউজারে পেজটি খুলুন অথবা ছবিটি চেপে ধরে / রাইট-ক্লিক করে ম্যানুয়ালি সেভ করুন।
-                  </p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleOpenExternalBrowser}
-                  className="w-full h-10 px-4 rounded-lg bg-[#5C2C16] hover:bg-[#451A03] text-[#FFF9F2] text-xs sm:text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Open in External Browser</span>
-                </button>
-
-                {externalBrowserHint && (
-                  <p className="text-[11px] text-[#5C2C16] bg-white/80 p-2 rounded-lg border border-amber-200 leading-relaxed">
-                    {externalBrowserHint}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Always-Visible Facebook Group Invitation in Popup */}
-            <div className="w-full pt-3 border-t border-[#E6D6C3] text-center space-y-2.5">
-              <p className="text-sm font-bold text-[#381B0E]">
-                আপনার চায়ের ব্যক্তিত্ব সবার সঙ্গে শেয়ার করুন!
-              </p>
-              <a
-                href={FACEBOOK_GROUP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => soundEffects.playTap()}
-                className="w-full h-11 px-4 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-all"
-              >
-                <span>Chakosh Facebook গ্রুপে পোস্ট করুন</span>
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            </div>
           </div>
         </div>
       )}

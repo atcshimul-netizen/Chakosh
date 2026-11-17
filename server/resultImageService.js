@@ -213,6 +213,7 @@ async function handleUploadReq(req, res) {
       success: true,
       id,
       downloadUrl,
+      imageUrl: `${basePath}/api/image/${id}`,
       filename: 'chakosh-result.png',
       expiresInMinutes: 10,
     }));
@@ -274,6 +275,46 @@ function handleDownloadReq(req, res, id) {
 }
 
 /**
+ * Handles GET /api/image/:id (inline display without attachment header)
+ */
+function handleImageInlineReq(req, res, id) {
+  if (!id || !ID_REGEX.test(id)) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify({ error: 'Invalid image ID format' }));
+    return;
+  }
+
+  if (isExpired(id)) {
+    res.statusCode = 410;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify({ error: 'This image has expired', expired: true }));
+    return;
+  }
+
+  const filePath = path.join(TEMP_DIR, `${id}.png`);
+  if (!fs.existsSync(filePath)) {
+    metadataStore.delete(id);
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify({ error: 'Image not found' }));
+    return;
+  }
+
+  const stat = fs.statSync(filePath);
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Length', stat.size);
+
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
+}
+
+/**
  * Unified Connect / Express middleware for download and upload routes
  */
 export function resultImageMiddleware(req, res, next) {
@@ -289,6 +330,12 @@ export function resultImageMiddleware(req, res, next) {
   const downloadMatch = pathname.match(/^(?:\/koto-boro-chakhor)?\/api\/download\/(.+)$/i);
   if (req.method === 'GET' && downloadMatch) {
     handleDownloadReq(req, res, downloadMatch[1]);
+    return;
+  }
+
+  const imageMatch = pathname.match(/^(?:\/koto-boro-chakhor)?\/api\/image\/(.+)$/i);
+  if (req.method === 'GET' && imageMatch) {
+    handleImageInlineReq(req, res, imageMatch[1]);
     return;
   }
 

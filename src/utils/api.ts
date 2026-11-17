@@ -2,6 +2,7 @@ export interface UploadResultResponse {
   success: boolean;
   id: string;
   downloadUrl: string;
+  imageUrl?: string;
   filename: string;
   expiresInMinutes: number;
 }

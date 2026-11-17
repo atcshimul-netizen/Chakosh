@@ -1,12 +1,9 @@
 export const FACEBOOK_GROUP_URL = 'https://www.facebook.com/groups/chakoshbackup';
 
-const FB_EXT_QUERY_PARAM = 'fb_ext';
-const FB_EXT_SESSION_KEY = 'chakosh_fb_ext_attempted';
-
 export function isFacebookInAppBrowser(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
-  return /FBAN|FBAV|FB_IAB|FBIOS|FB4A|FBMD|FBSN|Messenger/i.test(ua);
+  return /FBAN|FBAV|FB_IAB|FBIOS|FB4A|FBMD|FBSN|Messenger|Instagram/i.test(ua);
 }
 
 export function isIOSDevice(): boolean {
@@ -23,89 +20,102 @@ export function isAndroidDevice(): boolean {
   return /Android/i.test(navigator.userAgent || '');
 }
 
-function buildAndroidExternalIntentUrl(rawUrl: string): string | null {
-  try {
-    const targetUrl = new URL(rawUrl);
-    targetUrl.searchParams.delete(FB_EXT_QUERY_PARAM);
-
-    const fallbackUrl = new URL(targetUrl.toString());
-    fallbackUrl.searchParams.set(FB_EXT_QUERY_PARAM, '1');
-
-    const scheme = targetUrl.protocol.replace(':', '') || 'https';
-    const urlWithoutScheme = `${targetUrl.host}${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
-
-    return `intent://${urlWithoutScheme}#Intent;scheme=${scheme};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=${encodeURIComponent(
-      fallbackUrl.toString()
-    )};end`;
-  } catch {
-    return null;
+/**
+ * Constructs a deep-link URL carrying the quiz score, player name, and saved photocard ID.
+ * When opened in an external browser, the app opens directly to the result/download screen
+ * so the user never has to play the quiz again.
+ */
+export function buildResultShareUrl(options: {
+  score: number;
+  playerName?: string;
+  resultId?: string;
+}): string {
+  if (typeof window === 'undefined') return '';
+  const base = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams();
+  params.set('result', '1');
+  params.set('score', options.score.toString());
+  if (options.playerName && options.playerName.trim()) {
+    params.set('name', options.playerName.trim());
   }
+  if (options.resultId) {
+    params.set('id', options.resultId);
+  }
+  params.set('auto_popup', '1');
+  return `${base}?${params.toString()}`;
 }
 
 /**
- * Automatically attempts once on Android Facebook/Messenger in-app browser load
- * to hand off the page to the user's external default browser via Android Intent.
- * Guarded by sessionStorage and query parameter to prevent infinite redirect loops.
+ * Directly launches the user's external browser (Chrome on Android, or default browser)
+ * with the provided URL.
  */
-export function attemptAutoOpenExternalBrowserFromFacebook(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (!isFacebookInAppBrowser() || !isAndroidDevice()) return false;
-
-  // Never attempt top-level redirect from inside an embedded preview iframe
-  if (window.self !== window.top) return false;
-
-  try {
-    const parsed = new URL(window.location.href);
-    if (parsed.searchParams.get(FB_EXT_QUERY_PARAM) === '1') {
-      return false;
-    }
-    if (window.sessionStorage.getItem(FB_EXT_SESSION_KEY) === '1') {
-      return false;
-    }
-    window.sessionStorage.setItem(FB_EXT_SESSION_KEY, '1');
-  } catch {
-    // Continue if storage/URL checks throw
-  }
-
-  const intentUrl = buildAndroidExternalIntentUrl(window.location.href);
-  if (!intentUrl) return false;
-
-  window.location.href = intentUrl;
-  return true;
-}
-
-/**
- * Best-effort attempt to open the current URL in an external browser when clicked.
- * Note: iOS Facebook WebView blocks websites from programmatically launching Safari;
- * Android supports safe Intent fallback URLs when triggered by a user tap.
- */
-export function attemptOpenInExternalBrowser(): 'android-intent' | 'window-open' | 'ios-manual' {
-  if (typeof window === 'undefined') return 'ios-manual';
-
-  if (isIOSDevice() && isFacebookInAppBrowser()) {
-    return 'ios-manual';
-  }
-
-  const currentUrl = window.location.href;
+export function openExternalBrowserWithUrl(url: string): void {
+  if (typeof window === 'undefined' || !url) return;
 
   if (isAndroidDevice()) {
-    const intentUrl = buildAndroidExternalIntentUrl(currentUrl);
-    if (intentUrl) {
+    try {
+      const targetUrl = new URL(url);
+      const scheme = targetUrl.protocol.replace(':', '') || 'https';
+      const hostAndPath = `${targetUrl.host}${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
+
+      // Intent targeting Google Chrome on Android with fallback URL
+      const intentUrl = `intent://${hostAndPath}#Intent;scheme=${scheme};package=com.android.chrome;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=${encodeURIComponent(
+        url
+      )};end`;
+
       window.location.href = intentUrl;
-      return 'android-intent';
-    }
+      return;
+    } catch {}
   }
 
+  // Fallback for non-Android / iOS
   try {
     const link = document.createElement('a');
-    link.href = currentUrl;
+    link.href = url;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   } catch {
-    // Ignore popup blocker errors
+    window.location.href = url;
   }
-  return 'window-open';
+}
+
+/**
+ * Directly opens the Facebook group.
+ * When inside the Facebook in-app browser, uses fb://facewebmodal so the Facebook app
+ * opens the group directly without getting blocked by Facebook's external redirect filter.
+ */
+export function openFacebookGroup(): void {
+  if (typeof window === 'undefined') return;
+
+  const groupUrl = FACEBOOK_GROUP_URL;
+
+  if (isFacebookInAppBrowser()) {
+    try {
+      // In Facebook in-app browser, deep link directly to the native Facebook group view
+      window.location.href = `fb://facewebmodal/f?href=${encodeURIComponent(groupUrl)}`;
+      setTimeout(() => {
+        try {
+          window.location.href = groupUrl;
+        } catch {}
+      }, 400);
+      return;
+    } catch {}
+  }
+
+  // Standard browser redirect
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = groupUrl;
+      return;
+    }
+  } catch {}
+
+  try {
+    window.location.href = groupUrl;
+  } catch {
+    window.location.assign(groupUrl);
+  }
 }
