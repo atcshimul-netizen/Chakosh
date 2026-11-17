@@ -34,3 +34,45 @@
 .animate-steam-3 {
   animation: steamDrift 3.8s cubic-bezier(0.4, 0, 0.2, 1) 2.2s infinite;
 }
+
+/* High-CTR animated CTA button */
+@keyframes ctaPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 14px rgba(15, 96, 72, 0.35);
+  }
+  50% {
+    transform: scale(1.028);
+    box-shadow: 0 8px 24px rgba(15, 96, 72, 0.55);
+  }
+}
+
+@keyframes ctaShimmer {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  35%, 100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+@keyframes ctaGentleHop {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2.5px);
+  }
+}
+
+.animate-cta-pulse {
+  animation: ctaPulse 2s ease-in-out infinite;
+}
+
+.animate-cta-shimmer {
+  animation: ctaShimmer 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-cta-hop {
+  animation: ctaGentleHop 1.4s ease-in-out infinite;
+}

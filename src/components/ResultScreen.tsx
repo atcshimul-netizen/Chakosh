@@ -518,14 +518,21 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                     Facebook/Instagram-এর ভেতরের ব্রাউজারে সরাসরি ডাউনলোড হয় না। নিচের যেকোনো একটি উপায়ে সেভ করুন:
                   </p>
 
-                  {/* Primary Big Green Action Button */}
+                  {/* Primary Big Green Action Button (Animated to boost CTR) */}
                   <button
                     type="button"
                     onClick={handleOpenInChrome}
-                    className="w-full py-3.5 px-5 rounded-2xl bg-[#0F6048] hover:bg-[#0B4D39] active:scale-[0.98] text-white font-bold text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-md cursor-pointer transition-all"
+                    className="relative overflow-hidden w-full py-4 px-5 rounded-2xl bg-[#0F6048] hover:bg-[#0B4D39] active:scale-[0.98] text-white font-extrabold text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-lg cursor-pointer transition-all animate-cta-pulse"
                   >
-                    <Globe className="w-5 h-5 shrink-0" />
-                    <span>{isAndroid ? 'Chrome-এ খুলে ডাউনলোড করুন' : 'Safari / ব্রাউজারে খুলে ডাউনলোড করুন'}</span>
+                    {/* Shimmer sweep reflection */}
+                    <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none animate-cta-shimmer" />
+
+                    <Globe className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 relative z-10 animate-cta-hop" />
+                    <span className="relative z-10 tracking-tight">
+                      {isAndroid
+                        ? 'Chrome-এ ডাউনলোড করতে ট্যাপ করুন'
+                        : 'Safari / ব্রাউজারে ডাউনলোড করতে ট্যাপ করুন'}
+                    </span>
                   </button>
 
                   <p className="text-[11px] sm:text-xs text-[#64748B] mt-2.5 mb-5 leading-relaxed max-w-sm">
