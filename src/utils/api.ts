@@ -15,13 +15,24 @@ export async function uploadResultImage(blob: Blob): Promise<UploadResultRespons
   const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
   const endpoint = `${base}/api/result-image`;
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'image/png',
-    },
-    body: blob,
-  });
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? window.setTimeout(() => controller.abort(), 8000) : null;
+
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'image/png',
+      },
+      body: blob,
+      signal: controller?.signal,
+    });
+  } finally {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+  }
 
   if (!response.ok) {
     let errorMsg = `Server error ${response.status}`;

@@ -98,6 +98,8 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
   // If initialResultId is provided (e.g. redirected from Facebook to Chrome),
   // initialize the download assets and automatically open the download popup.
+  // If autoOpenPopup is true without initialResultId (e.g. static hosting deep-link),
+  // generate the photocard client-side and open the popup directly.
   useEffect(() => {
     if (initialResultId && !generatedAssets) {
       const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
@@ -114,12 +116,56 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       if (autoOpenPopup) {
         setShowPopup(true);
       }
+      return;
+    }
+
+    if (autoOpenPopup && !initialResultId && !generatedAssets && !isGenerating) {
+      let cancelled = false;
+      setIsGenerating(true);
+      generateResultAssets({
+        score,
+        personality,
+        playerName: initialPlayerName,
+        profileImageUrl: null,
+      })
+        .then(async (assets) => {
+          if (cancelled) return;
+          try {
+            const serverRes = await uploadResultImage(assets.blob);
+            if (!cancelled) {
+              setGeneratedAssets({
+                ...assets,
+                downloadUrl: serverRes.downloadUrl,
+                id: serverRes.id,
+              });
+            }
+          } catch {
+            if (!cancelled) {
+              setGeneratedAssets(assets);
+            }
+          }
+          if (!cancelled) {
+            setShowPopup(true);
+          }
+        })
+        .catch(() => {
+          // Leave user on result screen cleanly if auto-generation fails
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsGenerating(false);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
     }
   }, [initialResultId, autoOpenPopup]);
 
   // Invalidate cached photocard if player changes name or photo
   useEffect(() => {
-    if (!initialResultId) {
+    if (!initialResultId || playerName !== initialPlayerName || profileImageUrl) {
       setGeneratedAssets(null);
       setRedirectCountdown(null);
     }
@@ -194,28 +240,38 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
         playerName,
         profileImageUrl,
       });
-      const serverRes = await uploadResultImage(assets.blob);
-      setGeneratedAssets({
-        ...assets,
-        downloadUrl: serverRes.downloadUrl,
-        id: serverRes.id,
-      });
+
+      let finalAssets: GeneratedResultAssets = assets;
+      try {
+        const serverRes = await uploadResultImage(assets.blob);
+        finalAssets = {
+          ...assets,
+          downloadUrl: serverRes.downloadUrl,
+          id: serverRes.id,
+        };
+      } catch (uploadErr) {
+        // Static hosting deployments (e.g., /koto-boro-chakhor/) have no /api/* backend;
+        // continue seamlessly using the client-side generated Blob & Data URL.
+        console.warn('Server upload unavailable, using client-side photocard download:', uploadErr);
+      }
+
+      setGeneratedAssets(finalAssets);
 
       // Update current browser URL with deep-link state so external browser / Safari menu uses it
       try {
         const shareUrl = buildResultShareUrl({
           score,
           playerName,
-          resultId: serverRes.id,
+          resultId: finalAssets.id,
         });
         window.history.replaceState(null, '', shareUrl);
       } catch {}
 
       setShowPopup(true);
     } catch (err) {
-      console.error('Failed to generate or upload result image:', err);
+      console.error('Failed to generate result image:', err);
       setGeneratedAssets(null);
-      setGenerationError('দুঃখিত, ফটোকার্ড প্রস্তুত বা সার্ভারে আপলোড করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
+      setGenerationError('দুঃখিত, ফটোকার্ড তৈরি করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
       setShowPopup(true);
     } finally {
       setIsGenerating(false);
@@ -552,6 +608,18 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                         src={generatedAssets.dataUrl}
                         alt="চা-খোর রেজাল্ট কার্ড"
                         className="w-full h-full object-contain"
+                        onError={() => {
+                          if (generatedAssets.id && generatedAssets.dataUrl.startsWith('http')) {
+                            generateResultAssets({
+                              score,
+                              personality,
+                              playerName,
+                              profileImageUrl,
+                            })
+                              .then((fresh) => setGeneratedAssets(fresh))
+                              .catch(() => {});
+                          }
+                        }}
                       />
                     </div>
 
@@ -591,6 +659,18 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                       src={generatedAssets.dataUrl}
                       alt="চা-খোর রেজাল্ট কার্ড"
                       className="w-full h-full object-contain"
+                      onError={() => {
+                        if (generatedAssets.id && generatedAssets.dataUrl.startsWith('http')) {
+                          generateResultAssets({
+                            score,
+                            personality,
+                            playerName,
+                            profileImageUrl,
+                          })
+                            .then((fresh) => setGeneratedAssets(fresh))
+                            .catch(() => {});
+                        }
+                      }}
                     />
                   </div>
 
