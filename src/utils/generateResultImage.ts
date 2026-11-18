@@ -23,6 +23,10 @@ export interface GeneratedResultAssets {
 // Background template image (Image 2: Clean background template)
 const getTemplateImgSrc = () => getPublicAssetUrl('assets/aistudio/1a_2ae07336.jpg');
 
+// Robust Bengali font stack with Apple/iOS native font fallbacks
+const BENGALI_FONT_STACK =
+  '"Hind Siliguri", "Kohinoor Bangla", "Bangla Sangam MN", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
@@ -186,11 +190,11 @@ function fitSingleLineText(
   fontWeight = 'bold'
 ): { text: string; fontSize: number } {
   let fontSize = initialFontSize;
-  ctx.font = `${fontWeight} ${fontSize}px "Hind Siliguri", sans-serif`;
+  ctx.font = `${fontWeight} ${fontSize}px ${BENGALI_FONT_STACK}`;
 
   while (ctx.measureText(text).width > maxWidth && fontSize > minFontSize) {
     fontSize -= 1;
-    ctx.font = `${fontWeight} ${fontSize}px "Hind Siliguri", sans-serif`;
+    ctx.font = `${fontWeight} ${fontSize}px ${BENGALI_FONT_STACK}`;
   }
 
   if (ctx.measureText(text).width <= maxWidth) {
@@ -207,21 +211,31 @@ function fitSingleLineText(
 // Ensure web fonts are loaded before measuring or rendering (with timeout guard)
 async function ensureFontsLoaded(): Promise<void> {
   try {
-    if (document.fonts && document.fonts.load) {
-      const fontTask = Promise.all([
-        document.fonts.load('bold 64px "Hind Siliguri"'),
-        document.fonts.load('bold 52px "Hind Siliguri"'),
-        document.fonts.load('bold 44px "Hind Siliguri"'),
-        document.fonts.load('bold 28px "Hind Siliguri"'),
-        document.fonts.load('bold 26px "Hind Siliguri"'),
-        document.fonts.load('bold 22px "Hind Siliguri"'),
-        document.fonts.load('500 30px "Hind Siliguri"'),
-        document.fonts.load('500 27px "Hind Siliguri"'),
-        document.fonts.load('500 24px "Hind Siliguri"'),
-      ]).then(() => document.fonts.ready);
-
-      const timeout = new Promise<void>((resolve) => setTimeout(resolve, 1500));
-      await Promise.race([fontTask, timeout]);
+    if (typeof document !== 'undefined' && document.fonts) {
+      if (typeof document.fonts.load === 'function') {
+        const fontTask = Promise.all([
+          document.fonts.load('700 64px "Hind Siliguri"'),
+          document.fonts.load('bold 64px "Hind Siliguri"'),
+          document.fonts.load('700 52px "Hind Siliguri"'),
+          document.fonts.load('bold 52px "Hind Siliguri"'),
+          document.fonts.load('700 44px "Hind Siliguri"'),
+          document.fonts.load('700 28px "Hind Siliguri"'),
+          document.fonts.load('700 26px "Hind Siliguri"'),
+          document.fonts.load('700 22px "Hind Siliguri"'),
+          document.fonts.load('bold 22px "Hind Siliguri"'),
+          document.fonts.load('600 24px "Hind Siliguri"'),
+          document.fonts.load('500 30px "Hind Siliguri"'),
+          document.fonts.load('500 27px "Hind Siliguri"'),
+          document.fonts.load('500 24px "Hind Siliguri"'),
+          document.fonts.load('400 24px "Hind Siliguri"'),
+        ]);
+        const timeout = new Promise<void>((resolve) => setTimeout(resolve, 1500));
+        await Promise.race([fontTask, timeout]);
+      }
+      if (document.fonts.ready) {
+        const readyTimeout = new Promise<void>((resolve) => setTimeout(resolve, 1500));
+        await Promise.race([document.fonts.ready, readyTimeout]);
+      }
     }
   } catch (err) {
     console.warn('Font loading check:', err);
@@ -279,6 +293,9 @@ function drawBadgePhoto(ctx: CanvasRenderingContext2D, photoImg: HTMLImageElemen
 /**
  * Generates an exact 1080 × 1350 PNG Blob and Data URL using Image 2 as the clean background template,
  * preserving all existing artwork and inserting dynamic game data plus optional player personalisation.
+ *
+ * Uses explicit left-aligned coordinate mathematics (x = Math.round(targetX - width / 2)) to guarantee
+ * 100% pixel-perfect text placement across all iOS Safari (WebKit), Android, and Desktop platforms.
  */
 export async function generateResultAssets({
   score,
@@ -313,6 +330,9 @@ export async function generateResultAssets({
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
+  // Enforce LTR and left-alignment globally; explicit coordinates prevent iOS WebKit alignment bugs
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'left';
 
   // 1. Draw Image 2 (Clean background template) as the fixed 1080 x 1350 background
   ctx.drawImage(templateImg, 0, 0, 1080, 1350);
@@ -323,7 +343,8 @@ export async function generateResultAssets({
   if (avatarImg) {
     drawBadgePhoto(ctx, avatarImg);
   } else {
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'left';
+    ctx.direction = 'ltr';
     ctx.textBaseline = 'middle';
     ctx.font = '76px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 
@@ -332,20 +353,23 @@ export async function generateResultAssets({
       emojiMetrics.actualBoundingBoxAscent && emojiMetrics.actualBoundingBoxDescent
         ? (emojiMetrics.actualBoundingBoxAscent - emojiMetrics.actualBoundingBoxDescent) / 2
         : 0;
-    ctx.fillText(personality.emoji, 540, 412 + opticalY);
+    const emojiX = Math.round(540 - emojiMetrics.width / 2);
+    ctx.fillText(personality.emoji, emojiX, 412 + opticalY);
   }
 
   if (hasName) {
     const ribbonInnerMaxW = 170;
-    ctx.font = 'bold 22px "Hind Siliguri", sans-serif';
+    ctx.font = `bold 22px ${BENGALI_FONT_STACK}`;
     const naturalNameW = ctx.measureText(cleanName).width;
 
     if (naturalNameW <= ribbonInnerMaxW) {
       // Fits directly inside the template's original brown ribbon
       ctx.fillStyle = '#FFFFFF';
-      ctx.textAlign = 'center';
+      ctx.textAlign = 'left';
+      ctx.direction = 'ltr';
       ctx.textBaseline = 'middle';
-      ctx.fillText(cleanName, 540, 514);
+      const nameX = Math.round(540 - naturalNameW / 2);
+      ctx.fillText(cleanName, nameX, 514);
     } else {
       // Smoothly expand a matching brown ribbon horizontally for longer names
       const maxExpandedW = 460;
@@ -358,10 +382,10 @@ export async function generateResultAssets({
         17,
         'bold'
       );
-      ctx.font = `bold ${fitted.fontSize}px "Hind Siliguri", sans-serif`;
+      ctx.font = `bold ${fitted.fontSize}px ${BENGALI_FONT_STACK}`;
       const textW = ctx.measureText(fitted.text).width;
       const ribbonW = Math.max(194, Math.min(maxExpandedW, textW + ribbonPadX * 2));
-      const ribbonX = 540 - ribbonW / 2;
+      const ribbonX = Math.round(540 - ribbonW / 2);
       const ribbonY = 488;
       const ribbonH = 56;
 
@@ -375,45 +399,57 @@ export async function generateResultAssets({
       ctx.restore();
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.textAlign = 'center';
+      ctx.textAlign = 'left';
+      ctx.direction = 'ltr';
       ctx.textBaseline = 'middle';
-      ctx.font = `bold ${fitted.fontSize}px "Hind Siliguri", sans-serif`;
-      ctx.fillText(fitted.text, 540, 515);
+      ctx.font = `bold ${fitted.fontSize}px ${BENGALI_FONT_STACK}`;
+      const textX = Math.round(540 - textW / 2);
+      ctx.fillText(fitted.text, textX, 515);
     }
   } else {
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 22px "Hind Siliguri", sans-serif';
-    ctx.textAlign = 'center';
+    ctx.font = `bold 22px ${BENGALI_FONT_STACK}`;
+    ctx.textAlign = 'left';
+    ctx.direction = 'ltr';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`লেভেল ${toBengaliDigits(personality.level)}`, 540, 513);
+    const levelText = `লেভেল ${toBengaliDigits(personality.level)}`;
+    const levelW = ctx.measureText(levelText).width;
+    const levelX = Math.round(540 - levelW / 2);
+    ctx.fillText(levelText, levelX, 513);
   }
 
   // -------------------------------------------------------------
-  // 2. PERSONALITY TITLE
+  // 2. PERSONALITY TITLE (Centered manually at x = 540)
   // -------------------------------------------------------------
   let titleFontSize = 52;
   const maxTitleWidth = 680;
-  ctx.font = `bold ${titleFontSize}px "Hind Siliguri", sans-serif`;
+  ctx.font = `bold ${titleFontSize}px ${BENGALI_FONT_STACK}`;
 
   while (ctx.measureText(personality.title).width > maxTitleWidth && titleFontSize > 36) {
     titleFontSize -= 2;
-    ctx.font = `bold ${titleFontSize}px "Hind Siliguri", sans-serif`;
+    ctx.font = `bold ${titleFontSize}px ${BENGALI_FONT_STACK}`;
   }
 
   ctx.fillStyle = '#7A3207';
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
+  ctx.direction = 'ltr';
   ctx.textBaseline = 'middle';
-  ctx.fillText(personality.title, 540, 600);
+  const titleW = ctx.measureText(personality.title).width;
+  const titleX = Math.round(540 - titleW / 2);
+  ctx.fillText(personality.title, titleX, 600);
 
   // -------------------------------------------------------------
-  // 3. TOTAL SCORE
+  // 3. TOTAL SCORE (Right edge aligned manually at x = 590)
   // -------------------------------------------------------------
   const bengaliScore = toBengaliDigits(score);
   ctx.fillStyle = '#7B3307';
-  ctx.font = 'bold 64px "Hind Siliguri", sans-serif';
-  ctx.textAlign = 'right';
+  ctx.font = `bold 64px ${BENGALI_FONT_STACK}`;
+  ctx.textAlign = 'left';
+  ctx.direction = 'ltr';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(bengaliScore, 590, 726);
+  const scoreW = ctx.measureText(bengaliScore).width;
+  const scoreX = Math.round(590 - scoreW);
+  ctx.fillText(bengaliScore, scoreX, 726);
 
   // -------------------------------------------------------------
   // 4. PROGRESS BAR
@@ -446,31 +482,36 @@ export async function generateResultAssets({
   }
 
   // -------------------------------------------------------------
-  // 5. PERSONALITY DESCRIPTION
+  // 5. PERSONALITY DESCRIPTION (Safely centered within quote box)
   // -------------------------------------------------------------
   const isLongDescription = personality.description.length > 115;
   const descFontSize = isLongDescription ? 27 : 30;
   const descLineHeight = isLongDescription ? 43 : 47;
 
-  ctx.font = `500 ${descFontSize}px "Hind Siliguri", sans-serif`;
+  ctx.font = `500 ${descFontSize}px ${BENGALI_FONT_STACK}`;
   ctx.fillStyle = '#793208';
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
+  ctx.direction = 'ltr';
   ctx.textBaseline = 'middle';
 
-  const descLines = wrapText(ctx, personality.description, 720);
+  // Safe inner width of 640px ensures lines stay clear of quote ornaments
+  const descLines = wrapText(ctx, personality.description, 640);
   const totalDescHeight = descLines.length * descLineHeight;
   const startDescY = 932 - totalDescHeight / 2 + descLineHeight / 2;
 
   descLines.forEach((line, idx) => {
-    ctx.fillText(line, 540, startDescY + idx * descLineHeight);
+    const lineW = ctx.measureText(line).width;
+    const lineX = Math.round(540 - lineW / 2);
+    ctx.fillText(line, lineX, startDescY + idx * descLineHeight);
   });
 
   // -------------------------------------------------------------
   // 6. SCORE RANGE
   // -------------------------------------------------------------
   ctx.textAlign = 'left';
+  ctx.direction = 'ltr';
   ctx.textBaseline = 'alphabetic';
-  ctx.font = '500 24px "Hind Siliguri", sans-serif';
+  ctx.font = `500 24px ${BENGALI_FONT_STACK}`;
   ctx.fillStyle = '#6E4733';
   const rangeText = `${toBengaliDigits(personality.minScore)}–${toBengaliDigits(personality.maxScore)} পয়েন্ট`;
   ctx.fillText(rangeText, 534, 1114);
