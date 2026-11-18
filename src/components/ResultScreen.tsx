@@ -399,12 +399,23 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     setIsSharing(true);
     setPopupNotice(null);
 
+    const shareUrl = 'https://chakosh.nisorgo.com/koto-boro-chakhor/';
+    const caption = `আমি "আপনি কত বড় চা-খোর?" কুইজে ১০০-তে ${toBengaliDigits(score)} পেয়েছি! খেতাব: ${personality.title}।\n\nআপনি কত বড় চা-খোর? আপনার স্কোর চেক করতে এখানে খেলুন:\n${shareUrl}`;
+
+    // Auto-copy the exact caption to clipboard so user can paste it anywhere
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(caption);
+      }
+    } catch {}
+
     try {
       const result = await shareResultFile(
         generatedAssets.blob,
         generatedAssets.filename,
         score,
-        personality
+        personality,
+        shareUrl
       );
       if (result === 'shared') {
         setPopupNotice('শেয়ার শিট সম্পন্ন হয়েছে। আপনি চাইলে ছবিটি গ্যালারিতেও সেভ করতে পারেন।');

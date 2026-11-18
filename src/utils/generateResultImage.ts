@@ -571,22 +571,30 @@ export function canShareResultFile(blob: Blob, filename = 'chakosh-result.png'):
 /**
  * Attempts to share the generated PNG image via Web Share API.
  */
+export const DEFAULT_QUIZ_URL = 'https://chakosh.nisorgo.com/koto-boro-chakhor/';
+
+/**
+ * Attempts to share the generated PNG image via Web Share API.
+ */
 export async function shareResultFile(
   blob: Blob,
   filename: string,
   score: number,
-  personality: Personality
+  personality: Personality,
+  shareUrl = DEFAULT_QUIZ_URL
 ): Promise<'shared' | 'aborted' | 'unsupported' | 'failed'> {
   if (!canShareResultFile(blob, filename)) {
     return 'unsupported';
   }
+
+  const caption = `আমি "আপনি কত বড় চা-খোর?" কুইজে ১০০-তে ${toBengaliDigits(score)} পেয়েছি! খেতাব: ${personality.title}।\n\nআপনি কত বড় চা-খোর? আপনার স্কোর চেক করতে এখানে খেলুন:\n${shareUrl}`;
 
   try {
     const file = new File([blob], filename, { type: 'image/png' });
     await navigator.share({
       files: [file],
       title: 'আপনি কত বড় চা-খোর?',
-      text: `আমি "আপনি কত বড় চা-খোর?" কুইজে ১০০-তে ${toBengaliDigits(score)} পেয়েছি! খেতাব: ${personality.title}`,
+      text: caption,
     });
     return 'shared';
   } catch (err: unknown) {
