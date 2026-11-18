@@ -7,7 +7,6 @@ import {
   Loader2,
   X,
   Eye,
-  Share2,
   ExternalLink,
   Upload,
   User,
@@ -17,19 +16,19 @@ import {
   Users,
   Clock,
   Globe,
+  Gift,
 } from 'lucide-react';
 import { soundEffects } from '../utils/sound.ts';
 import { toBengaliDigits } from '../data/quizData.ts';
 import {
   generateResultAssets,
   processProfileImageFile,
-  canShareResultFile,
-  shareResultFile,
-  GeneratedResultAssets,
+    GeneratedResultAssets,
 } from '../utils/generateResultImage.ts';
 import {
   isFacebookInAppBrowser,
   isAndroidDevice,
+  isIOSDevice,
   openFacebookGroup,
   buildResultShareUrl,
   openExternalBrowserWithUrl,
@@ -72,7 +71,6 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   // Download / share / 5-second Facebook redirect countdown state
   const [popupNotice, setPopupNotice] = useState<string | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
 
   const isFbBrowser = isFacebookInAppBrowser();
   const isAndroid = isAndroidDevice();
@@ -392,34 +390,74 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     setRedirectCountdown(5);
   };
 
-  const handlePopupShare = async () => {
-    if (!generatedAssets || !generatedAssets.blob) return;
+    const handleShareToFacebook = () => {
     soundEffects.playTap();
-    setIsSharing(true);
-    setPopupNotice(null);
+    const shareUrl = buildResultShareUrl({
+      score,
+      playerName,
+      resultId: generatedAssets?.id,
+      backend: generatedAssets?.backend || initialResultBackend,
+    });
 
-    try {
-      const result = await shareResultFile(
-        generatedAssets.blob,
-        generatedAssets.filename,
-        score,
-        personality
+    const fbSharerUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+
+    if (isAndroidDevice() || isIOSDevice()) {
+      window.open(fbSharerUrl, '_blank');
+    } else {
+      window.open(
+        fbSharerUrl,
+        'fb_share',
+        'width=620,height=580,menubar=no,toolbar=no,resizable=yes'
       );
-      if (result === 'shared') {
-        setPopupNotice('শেয়ার শিট সম্পন্ন হয়েছে। আপনি চাইলে ছবিটি গ্যালারিতেও সেভ করতে পারেন।');
-      } else if (result === 'unsupported' || result === 'failed') {
-        setPopupNotice(
-          'এই ব্রাউজারে সরাসরি ফাইল শেয়ার সমর্থিত নয়। দয়া করে "ডাউনলোড করুন" বাটন ব্যবহার করুন অথবা ছবির ওপর চেপে ধরে সেভ করুন।'
-        );
-      }
-    } finally {
-      setIsSharing(false);
     }
+
+    setPopupNotice('Facebook শেয়ার উইন্ডো খোলা হয়েছে! আপনার প্রোফাইলে পোস্ট সম্পন্ন করে আকর্ষণীয় পুরস্কার জিতে নিন।');
   };
 
-  const canNativeShare = generatedAssets && generatedAssets.blob
-    ? canShareResultFile(generatedAssets.blob, generatedAssets.filename)
-    : false;
+  const handleShareToMessenger = async () => {
+    soundEffects.playTap();
+    const shareUrl = buildResultShareUrl({
+      score,
+      playerName,
+      resultId: generatedAssets?.id,
+      backend: generatedAssets?.backend || initialResultBackend,
+    });
+
+    // Copy link to clipboard first so user can easily paste to 10 friends
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      }
+    } catch {}
+
+    // On mobile devices, try opening the official Messenger app share sheet
+    if (isAndroidDevice() || isIOSDevice()) {
+      try {
+        const messengerUri = `fb-messenger://share?link=${encodeURIComponent(shareUrl)}`;
+        window.location.href = messengerUri;
+        setPopupNotice('কুইজ লিংক কপি হয়েছে! Messenger-এ যেকোনো ১০ জন বন্ধুকে পাঠিয়ে দিন।');
+        return;
+      } catch {}
+    }
+
+    // Try Web Share API if supported
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'আপনি কত বড় চা-খোর?',
+          text: `আমি "আপনি কত বড় চা-খোর?" কুইজে ১০০-তে ${toBengaliDigits(score)} পেয়েছি! খেতাব: ${personality.title}। তুমি কত বড় চা-খোর টেস্ট করো:`,
+          url: shareUrl,
+        });
+        setPopupNotice('শেয়ার শিট খোলা হয়েছে! বন্ধুদের পাঠিয়ে দিন।');
+        return;
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+
+    // Desktop / clipboard notification
+    setPopupNotice('কুইজ লিংক কপি করা হয়েছে! এবার Messenger-এ যেকোনো ১০ জন বন্ধুকে পেস্ট করে পাঠিয়ে দিন।');
+  };
 
   return (
     <div className="w-full max-w-lg mx-auto px-3.5 sm:px-4 pt-1.5 pb-6 sm:py-6 flex flex-col items-center">
@@ -703,6 +741,39 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                     </p>
                   </div>
 
+                  {/* Viral Reward Contest Box */}
+                  <div className="w-full p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B]/30 text-center shadow-2xs mb-2.5">
+                    <p className="text-xs sm:text-sm font-bold text-[#92400E] flex items-center justify-center gap-1.5 leading-snug">
+                      <Gift className="w-4 h-4 text-[#D97706] shrink-0" />
+                      <span>Facebook প্রোফাইলে শেয়ার করে অথবা Messenger-এ ১০ জনকে শেয়ার করে জিতে নিতে পারেন আকর্ষণীয় পুরস্কার!</span>
+                    </p>
+                  </div>
+
+                  {/* Facebook & Messenger Share Buttons */}
+                  <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={handleShareToFacebook}
+                      className="w-full h-11 px-3 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all"
+                    >
+                      <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                      </svg>
+                      <span>Facebook-এ শেয়ার করুন</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleShareToMessenger}
+                      className="w-full h-11 px-3 rounded-xl bg-gradient-to-r from-[#0084FF] to-[#00C6FF] hover:opacity-95 active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all"
+                    >
+                      <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                        <path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.302 2.249.464 3.443.464 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26 6.559-6.963 3.13 3.259 5.888-3.259-6.559 6.963z" />
+                      </svg>
+                      <span>Messenger-এ শেয়ার করুন</span>
+                    </button>
+                  </div>
+
                   {/* Direct Facebook Group button */}
                   <div className="w-full pt-3 border-t border-[#E6D6C3] text-center space-y-2">
                     <p className="text-xs sm:text-sm font-bold text-[#381B0E]">
@@ -759,26 +830,38 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                       </span>
                     </a>
 
-                    {canNativeShare && (
+                    {/* Viral Reward Contest Box */}
+                    <div className="w-full p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B]/30 text-center shadow-2xs">
+                      <p className="text-xs sm:text-sm font-bold text-[#92400E] flex items-center justify-center gap-1.5 leading-snug">
+                        <Gift className="w-4 h-4 text-[#D97706] shrink-0" />
+                        <span>Facebook প্রোফাইলে শেয়ার করে অথবা Messenger-এ ১০ জনকে শেয়ার করে জিতে নিতে পারেন আকর্ষণীয় পুরস্কার!</span>
+                      </p>
+                    </div>
+
+                    {/* Facebook & Messenger Share Buttons */}
+                    <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={handlePopupShare}
-                        disabled={isSharing}
-                        className="w-full h-11 px-4 rounded-xl bg-white hover:bg-[#FDFBF7] border border-[#D5C2AF] active:scale-[0.98] text-[#5C2C16] text-sm font-bold flex items-center justify-center gap-2 shadow-2xs cursor-pointer transition-all"
+                        onClick={handleShareToFacebook}
+                        className="w-full h-11 px-3 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all"
                       >
-                        {isSharing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>শেয়ার অপশন খুলছে...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Share2 className="w-4 h-4 text-[#8B4513]" />
-                            <span>শেয়ার বা সেভ করুন</span>
-                          </>
-                        )}
+                        <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                        </svg>
+                        <span>Facebook-এ শেয়ার করুন</span>
                       </button>
-                    )}
+
+                      <button
+                        type="button"
+                        onClick={handleShareToMessenger}
+                        className="w-full h-11 px-3 rounded-xl bg-gradient-to-r from-[#0084FF] to-[#00C6FF] hover:opacity-95 active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all"
+                      >
+                        <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.302 2.249.464 3.443.464 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26 6.559-6.963 3.13 3.259 5.888-3.259-6.559 6.963z" />
+                        </svg>
+                        <span>Messenger-এ শেয়ার করুন</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* 5-Second Redirect Countdown Banner */}
