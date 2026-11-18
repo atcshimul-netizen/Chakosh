@@ -390,14 +390,25 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     setRedirectCountdown(5);
   };
 
-    const handleShareToFacebook = () => {
+    const handleShareToFacebook = async () => {
     soundEffects.playTap();
     const shareUrl = buildResultShareUrl({
       score,
       playerName,
       resultId: generatedAssets?.id,
       backend: generatedAssets?.backend || initialResultBackend,
+      personality: { title: personality.title, description: personality.description },
+      useShareEndpoint: true,
     });
+
+    const caption = `আমি "আপনি কত বড় চা-খোর?" কুইজে ১০০-তে ${toBengaliDigits(score)} পেয়েছি! খেতাব: ${personality.title}। আপনি কত বড় চা-খোর টেস্ট করে দেখুন:`;
+
+    // Copy caption to clipboard so user can easily paste it into Facebook post
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(`${caption}\n${shareUrl}`);
+      }
+    } catch {}
 
     const fbSharerUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
 
@@ -411,7 +422,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       );
     }
 
-    setPopupNotice('Facebook শেয়ার উইন্ডো খোলা হয়েছে! আপনার প্রোফাইলে পোস্ট সম্পন্ন করে আকর্ষণীয় পুরস্কার জিতে নিন।');
+    setPopupNotice('✅ পোস্টের আকর্ষণীয় ক্যাপশন কপি হয়েছে! ফেসবুকে পোস্টের বক্সে পেস্ট (Paste) করে দিন।');
   };
 
   const handleShareToMessenger = async () => {
@@ -421,42 +432,46 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
       playerName,
       resultId: generatedAssets?.id,
       backend: generatedAssets?.backend || initialResultBackend,
+      personality: { title: personality.title, description: personality.description },
+      useShareEndpoint: true,
     });
 
-    // Copy link to clipboard first so user can easily paste to 10 friends
+    const caption = `আমি "আপনি কত বড় চা-খোর?" কুইজে ১০০-তে ${toBengaliDigits(score)} পেয়েছি! খেতাব: ${personality.title}। আপনি কত বড় চা-খোর টেস্ট করে দেখুন:`;
+
+    // Copy caption and link to clipboard
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
+        await navigator.clipboard.writeText(`${caption}\n${shareUrl}`);
       }
     } catch {}
 
-    // On mobile devices, try opening the official Messenger app share sheet
-    if (isAndroidDevice() || isIOSDevice()) {
-      try {
-        const messengerUri = `fb-messenger://share?link=${encodeURIComponent(shareUrl)}`;
-        window.location.href = messengerUri;
-        setPopupNotice('কুইজ লিংক কপি হয়েছে! Messenger-এ যেকোনো ১০ জন বন্ধুকে পাঠিয়ে দিন।');
-        return;
-      } catch {}
-    }
-
-    // Try Web Share API if supported
+    // On mobile devices with Web Share API, native share sends text caption + link directly
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
           title: 'আপনি কত বড় চা-খোর?',
-          text: `আমি "আপনি কত বড় চা-খোর?" কুইজে ১০০-তে ${toBengaliDigits(score)} পেয়েছি! খেতাব: ${personality.title}। তুমি কত বড় চা-খোর টেস্ট করো:`,
+          text: `${caption}\n`,
           url: shareUrl,
         });
-        setPopupNotice('শেয়ার শিট খোলা হয়েছে! বন্ধুদের পাঠিয়ে দিন।');
+        setPopupNotice('✅ শেয়ার অপশন খোলা হয়েছে! Messenger-এ বন্ধুদের পাঠিয়ে দিন।');
         return;
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') return;
       }
     }
 
-    // Desktop / clipboard notification
-    setPopupNotice('কুইজ লিংক কপি করা হয়েছে! এবার Messenger-এ যেকোনো ১০ জন বন্ধুকে পেস্ট করে পাঠিয়ে দিন।');
+    // On mobile devices without Web Share, try launching Messenger URI directly
+    if (isAndroidDevice() || isIOSDevice()) {
+      try {
+        const messengerUri = `fb-messenger://share?link=${encodeURIComponent(shareUrl)}`;
+        window.location.href = messengerUri;
+        setPopupNotice('✅ ক্যাপশন ও লিংক কপি হয়েছে! Messenger-এ যেকোনো ১০ জন বন্ধুকে পেস্ট (Paste) করে পাঠিয়ে দিন।');
+        return;
+      } catch {}
+    }
+
+    // Desktop notification
+    setPopupNotice('✅ ক্যাপশন ও কুইজ লিংক কপি হয়েছে! Messenger-এ যেকোনো ১০ জন বন্ধুকে পেস্ট (Paste) করে পাঠিয়ে দিন।');
   };
 
   return (
@@ -750,7 +765,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                   </div>
 
                   {/* Facebook & Messenger Share Buttons */}
-                  <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                  <div className="w-full grid grid-cols-2 gap-2 mb-3">
                     <button
                       type="button"
                       onClick={handleShareToFacebook}
@@ -759,7 +774,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                       <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                       </svg>
-                      <span>Facebook-এ শেয়ার করুন</span>
+                      <span className="truncate">Facebook-এ শেয়ার</span>
                     </button>
 
                     <button
@@ -770,7 +785,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                       <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
                         <path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.302 2.249.464 3.443.464 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26 6.559-6.963 3.13 3.259 5.888-3.259-6.559 6.963z" />
                       </svg>
-                      <span>Messenger-এ শেয়ার করুন</span>
+                      <span className="truncate">Messenger-এ শেয়ার</span>
                     </button>
                   </div>
 
@@ -839,7 +854,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                     </div>
 
                     {/* Facebook & Messenger Share Buttons */}
-                    <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="w-full grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={handleShareToFacebook}
@@ -848,7 +863,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                         <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
                           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                         </svg>
-                        <span>Facebook-এ শেয়ার করুন</span>
+                        <span className="truncate">Facebook-এ শেয়ার</span>
                       </button>
 
                       <button
@@ -859,7 +874,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                         <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
                           <path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.302 2.249.464 3.443.464 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26 6.559-6.963 3.13 3.259 5.888-3.259-6.559 6.963z" />
                         </svg>
-                        <span>Messenger-এ শেয়ার করুন</span>
+                        <span className="truncate">Messenger-এ শেয়ার</span>
                       </button>
                     </div>
                   </div>

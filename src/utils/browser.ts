@@ -22,17 +22,21 @@ export function isAndroidDevice(): boolean {
 
 /**
  * Constructs a deep-link URL carrying the quiz score, player name, and saved photocard ID.
- * When opened in an external browser, the app opens directly to the result/download screen
- * so the user never has to play the quiz again.
+ * When useShareEndpoint is true, targets share.php so Facebook & Messenger crawlers
+ * can extract dynamic Open Graph images and personalized captions.
  */
 export function buildResultShareUrl(options: {
   score: number;
   playerName?: string;
   resultId?: string;
   backend?: 'express' | 'php';
+  personality?: { title: string; description: string };
+  useShareEndpoint?: boolean;
 }): string {
   if (typeof window === 'undefined') return '';
-  const base = window.location.origin + window.location.pathname;
+  const origin = window.location.origin;
+  const pathname = window.location.pathname;
+
   const params = new URLSearchParams();
   params.set('result', '1');
   params.set('score', options.score.toString());
@@ -45,7 +49,18 @@ export function buildResultShareUrl(options: {
       params.set('mode', 'php');
     }
   }
+  if (options.personality) {
+    params.set('title', options.personality.title);
+    params.set('desc', options.personality.description);
+  }
   params.set('auto_popup', '1');
+
+  if (options.useShareEndpoint) {
+    const dir = pathname.substring(0, pathname.lastIndexOf('/') + 1) || '/';
+    return `${origin}${dir}share.php?${params.toString()}`;
+  }
+
+  const base = origin + pathname;
   return `${base}?${params.toString()}`;
 }
 
