@@ -719,7 +719,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                   <div className="w-full p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B]/30 text-center shadow-2xs mb-2.5">
                     <p className="text-xs sm:text-sm font-bold text-[#92400E] flex items-center justify-center gap-1.5 leading-snug">
                       <Gift className="w-4 h-4 text-[#D97706] shrink-0" />
-                      <span>Facebook প্রোফাইলে শেয়ার করে অথবা Messenger-এ ১০ জনকে শেয়ার করে জিতে নিতে পারেন আকর্ষণীয় পুরস্কার!</span>
+                      <span>Facebook প্রোফাইলে শেয়ার করে অথবা Messenger-এ ১০ জনকে শেয়ার করে জিতে নিতে পারেন এক কাপ চা 😂!</span>
                     </p>
                   </div>
 
@@ -828,7 +828,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                     <div className="w-full p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] border border-[#F59E0B]/30 text-center shadow-2xs">
                       <p className="text-xs sm:text-sm font-bold text-[#92400E] flex items-center justify-center gap-1.5 leading-snug">
                         <Gift className="w-4 h-4 text-[#D97706] shrink-0" />
-                        <span>Facebook প্রোফাইলে শেয়ার করে অথবা Messenger-এ ১০ জনকে শেয়ার করে জিতে নিতে পারেন আকর্ষণীয় পুরস্কার!</span>
+                        <span>Facebook প্রোফাইলে শেয়ার করে অথবা Messenger-এ ১০ জনকে শেয়ার করে জিতে নিতে পারেন এক কাপ চা 😂!</span>
                       </p>
                     </div>
 
