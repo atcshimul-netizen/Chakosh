@@ -209,7 +209,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     }
   }, [playerName, profileImageUrl, score, personality.level]);
 
-  // Handle 5-second countdown before redirecting to the Facebook group
+  // Handle 3-second countdown before redirecting to the Facebook group
   useEffect(() => {
     if (!showPopup || redirectCountdown === null) return;
 
@@ -392,7 +392,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     }
     soundEffects.playTap();
     setPopupNotice(null);
-    setRedirectCountdown(5);
+    setRedirectCountdown(3);
   };
 
       const handlePopupShare = async (platform: 'facebook' | 'messenger' = 'facebook') => {
@@ -810,7 +810,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                   </div>
 
                   <p className="text-xs text-center text-[#7C5A43] mb-3">
-                    ডাউনলোডে ক্লিক করলে ছবি ডাউনলোড শুরু হবে এবং ৫ সেকেন্ড পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হবে।
+                    ডাউনলোডে ক্লিক করলে ছবি ডাউনলোড শুরু হবে এবং ৩ সেকেন্ড পর আপনাকে Facebook গ্রুপে নিয়ে যাওয়া হবে।
                   </p>
 
                   {/* Primary Direct HTTPS Download & Optional Share Actions */}
@@ -885,7 +885,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                     </div>
                   </div>
 
-                  {/* 5-Second Redirect Countdown Banner */}
+                  {/* 3-Second Redirect Countdown Banner */}
                   {redirectCountdown !== null && redirectCountdown > 0 && (
                     <div className="w-full mb-3 p-3.5 rounded-xl bg-[#EEF5FF] border border-[#B9D4FA] text-[#1E3A5F] space-y-2.5">
                       <div className="flex items-center gap-2.5">
@@ -904,7 +904,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                       <div className="w-full h-1.5 bg-[#D4E4FC] rounded-full overflow-hidden">
                         <div
                           className="h-full bg-[#1877F2] rounded-full transition-all duration-1000 ease-linear"
-                          style={{ width: `${((6 - redirectCountdown) / 5) * 100}%` }}
+                          style={{ width: `${((4 - redirectCountdown) / 3) * 100}%` }}
                         />
                       </div>
 
