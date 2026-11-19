@@ -7,3 +7,7 @@ coverage/
 .env*
 !.env.example
 .temp-downloads/
+*.sqlite*
+.data/
+api/.data/
+public/api/.data/

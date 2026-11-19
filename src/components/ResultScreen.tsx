@@ -37,6 +37,7 @@ import {
 } from '../utils/browser.ts';
 import { ResultCardView } from './ResultCardView.tsx';
 import { uploadResultImage } from '../utils/api.ts';
+import { trackDownload, trackShareFacebook, trackShareMessenger } from '../utils/analytics.ts';
 
 interface ResultScreenProps {
   score: number;
@@ -380,6 +381,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   };
 
   const handlePopupDownload = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    trackDownload();
     if (!generatedAssets) {
       e.preventDefault();
       return;
@@ -393,7 +395,12 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
     setRedirectCountdown(5);
   };
 
-      const handlePopupShare = async () => {
+      const handlePopupShare = async (platform: 'facebook' | 'messenger' = 'facebook') => {
+    if (platform === 'messenger') {
+      trackShareMessenger();
+    } else {
+      trackShareFacebook();
+    }
     if (!generatedAssets || !generatedAssets.blob) return;
     soundEffects.playTap();
     setIsSharing(true);
@@ -727,7 +734,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                   <div className="w-full grid grid-cols-2 gap-2 mb-3">
                     <button
                       type="button"
-                      onClick={handlePopupShare}
+                      onClick={() => handlePopupShare('facebook')}
                       disabled={isSharing}
                       className="w-full h-11 px-2 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all disabled:opacity-75"
                     >
@@ -748,7 +755,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
                     <button
                       type="button"
-                      onClick={handlePopupShare}
+                      onClick={() => handlePopupShare('messenger')}
                       disabled={isSharing}
                       className="w-full h-11 px-2 rounded-xl bg-gradient-to-r from-[#0084FF] to-[#00C6FF] hover:opacity-95 active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all disabled:opacity-75"
                     >
@@ -836,7 +843,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
                     <div className="w-full grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={handlePopupShare}
+                        onClick={() => handlePopupShare('facebook')}
                         disabled={isSharing}
                         className="w-full h-11 px-2 rounded-xl bg-[#1877F2] hover:bg-[#1464CC] active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all disabled:opacity-75"
                       >
@@ -857,7 +864,7 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
 
                       <button
                         type="button"
-                        onClick={handlePopupShare}
+                        onClick={() => handlePopupShare('messenger')}
                         disabled={isSharing}
                         className="w-full h-11 px-2 rounded-xl bg-gradient-to-r from-[#0084FF] to-[#00C6FF] hover:opacity-95 active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all disabled:opacity-75"
                       >

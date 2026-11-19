@@ -1,11 +1,31 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { QuizStage } from './types.ts';
 import { QUESTIONS, getPersonality } from './data/quizData.ts';
 import { Header } from './components/Header.tsx';
 import { WelcomeScreen } from './components/WelcomeScreen.tsx';
 import { QuestionScreen } from './components/QuestionScreen.tsx';
 import { ResultScreen } from './components/ResultScreen.tsx';
+import { AdminPortal } from './components/AdminPortal.tsx';
 import { soundEffects } from './utils/sound.ts';
+import {
+  trackVisit,
+  trackPlay,
+  trackComplete,
+  startHeartbeat,
+} from './utils/analytics.ts';
+
+function checkIsAdminRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.toLowerCase();
+  const search = window.location.search.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  return (
+    path.endsWith('/admin') ||
+    path.endsWith('/admin/') ||
+    search.includes('admin') ||
+    hash === '#admin'
+  );
+}
 
 export default function App() {
   // Read initial query params to support directly opening the result & download screen
@@ -23,10 +43,33 @@ export default function App() {
   const initialResultBackend = searchParams.get('mode') === 'php' ? 'php' : undefined;
   const autoOpenPopup = searchParams.get('auto_popup') === '1' || hasResultParam;
 
+  const [isAdminView, setIsAdminView] = useState<boolean>(() => checkIsAdminRoute());
   const [stage, setStage] = useState<QuizStage>(() => (hasResultParam ? 'result' : 'welcome'));
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [soundEnabled, setSoundEnabled] = useState<boolean>(soundEffects.enabled);
+
+  // Synchronize browser history / hash for admin portal access
+  useEffect(() => {
+    const handleRouteChange = () => {
+      setIsAdminView(checkIsAdminRoute());
+    };
+    window.addEventListener('hashchange', handleRouteChange);
+    window.addEventListener('popstate', handleRouteChange);
+    return () => {
+      window.removeEventListener('hashchange', handleRouteChange);
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, []);
+
+  // Telemetry: track initial visit & run live visitor heartbeat
+  useEffect(() => {
+    trackVisit(stage);
+    const cleanupHeartbeat = startHeartbeat(() => stage);
+    return () => {
+      cleanupHeartbeat();
+    };
+  }, []);
 
   const handleToggleSound = () => {
     const nextState = soundEffects.toggleSound();
@@ -34,6 +77,7 @@ export default function App() {
   };
 
   const handleStart = () => {
+    trackPlay();
     soundEffects.playTap();
     setStage('quiz');
     setCurrentQuestionIndex(0);
@@ -83,6 +127,7 @@ export default function App() {
   }, [activeScore]);
 
   const handleSubmit = () => {
+    trackComplete(activeScore, personality.title);
     setStage('result');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -97,6 +142,24 @@ export default function App() {
     } catch {}
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // If in admin mode, display the Admin Portal dashboard
+  if (isAdminView) {
+    return (
+      <AdminPortal
+        onBackToGame={() => {
+          setIsAdminView(false);
+          if (window.location.hash.toLowerCase().includes('admin')) {
+            try {
+              window.history.pushState(null, '', window.location.pathname);
+            } catch {
+              window.location.hash = '';
+            }
+          }
+        }}
+      />
+    );
+  }
 
   const currentQuestion = QUESTIONS[currentQuestionIndex];
   const selectedOptionForCurrent = answers[currentQuestionIndex];
@@ -154,7 +217,21 @@ export default function App() {
       <footer className="w-full border-t border-[#EAE0D2] py-4 px-4 text-center text-xs text-[#8F7463]">
         <div className="max-w-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>আপনি কত বড় চা-খোর? · খাঁটি বাঙালি চা কুইজ</span>
-          <span className="text-[#AFA193]">চায়ের কাপে ঝড় উঠুক প্রতিদিন ☕</span>
+          <div className="flex items-center gap-3 text-[#AFA193]">
+            <span>চায়ের কাপে ঝড় উঠুক প্রতিদিন ☕</span>
+            <a
+              href="#admin"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsAdminView(true);
+                window.location.hash = 'admin';
+              }}
+              className="text-[#BCAEA2] hover:text-[#5C2C16] transition-colors underline"
+              title="এডমিন লগইন"
+            >
+              এডমিন
+            </a>
+          </div>
         </div>
       </footer>
     </div>
